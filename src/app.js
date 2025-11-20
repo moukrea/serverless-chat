@@ -3,6 +3,11 @@
  */
 import './styles/main.css';
 import p2p from './p2p.js';
+import process from 'process';
+
+// Polyfill for SimplePeer dependencies
+window.process = process;
+globalThis.process = process;
 
 const $ = (id) => document.getElementById(id);
 
