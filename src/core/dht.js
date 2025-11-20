@@ -25,7 +25,17 @@ class DHTDiscovery {
     }
 
     const infoHash = await createInfoHash(passphrase);
-    const magnetURI = `magnet:?xt=urn:btih:${infoHash}&dn=p2pmesh`;
+
+    // Add WebTorrent public trackers for peer discovery
+    const trackers = [
+      'wss://tracker.openwebtorrent.com',
+      'wss://tracker.btorrent.xyz',
+      'wss://tracker.webtorrent.dev',
+      'wss://tracker.files.fm:7073/announce',
+    ];
+
+    const trackerParams = trackers.map(t => `tr=${encodeURIComponent(t)}`).join('&');
+    const magnetURI = `magnet:?xt=urn:btih:${infoHash}&dn=p2pmesh&${trackerParams}`;
 
     // Check if torrent already exists
     const existingTorrent = this.client.get(infoHash);
@@ -35,7 +45,7 @@ class DHTDiscovery {
     }
 
     return new Promise((resolve, reject) => {
-      this.client.add(magnetURI, { announce: [] }, torrent => {
+      this.client.add(magnetURI, torrent => {
         this.activeTorrent = torrent;
 
         torrent.on('wire', wire => {
