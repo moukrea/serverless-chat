@@ -3,35 +3,35 @@
    ============================================ */
 
 :root {
-  /* Light Theme Colors */
+  /* Light Theme Colors - Bright & Modern */
   --light-bg-primary: #ffffff;
-  --light-bg-secondary: #f2f3f5;
-  --light-bg-tertiary: #e3e5e8;
-  --light-bg-sidebar: #f2f3f5;
+  --light-bg-secondary: #f9fafb;
+  --light-bg-tertiary: #f3f4f6;
+  --light-bg-sidebar: #fafbfc;
   --light-bg-chat: #ffffff;
   --light-bg-message-sent: #5865f2;
-  --light-bg-message-received: #f2f3f5;
-  --light-bg-message-system: #fef3c7;
-  --light-bg-hover: #e3e5e8;
-  --light-bg-active: #d4d7dc;
-  --light-bg-modal: rgba(0, 0, 0, 0.6);
+  --light-bg-message-received: #f3f4f6;
+  --light-bg-message-system: #fef9e7;
+  --light-bg-hover: #f0f1f3;
+  --light-bg-active: #e5e7eb;
+  --light-bg-modal: rgba(0, 0, 0, 0.5);
 
-  --light-text-primary: #060607;
-  --light-text-secondary: #4e5058;
-  --light-text-muted: #80848e;
-  --light-text-link: #00a8fc;
+  --light-text-primary: #111827;
+  --light-text-secondary: #6b7280;
+  --light-text-muted: #9ca3af;
+  --light-text-link: #0ea5e9;
   --light-text-on-accent: #ffffff;
 
-  --light-border-color: #e3e5e8;
-  --light-border-hover: #d4d7dc;
+  --light-border-color: #e5e7eb;
+  --light-border-hover: #d1d5db;
 
   --light-accent-primary: #5865f2;
-  --light-accent-success: #23a55a;
-  --light-accent-warning: #f0b232;
-  --light-accent-danger: #f23f43;
+  --light-accent-success: #10b981;
+  --light-accent-warning: #f59e0b;
+  --light-accent-danger: #ef4444;
 
-  --light-shadow: rgba(0, 0, 0, 0.1);
-  --light-shadow-hover: rgba(0, 0, 0, 0.15);
+  --light-shadow: rgba(99, 102, 241, 0.04);
+  --light-shadow-hover: rgba(99, 102, 241, 0.08);
 
   /* Dark Theme Colors */
   --dark-bg-primary: #313338;
@@ -172,7 +172,8 @@ body {
   background-color: var(--bg-primary);
   color: var(--text-primary);
   line-height: 1.5;
-  height: 100vh;
+  height: 100vh;      /* Fallback for older browsers */
+  height: 100dvh;     /* Dynamic viewport height - adapts to mobile browser UI */
   overflow: hidden;
   transition: background-color var(--transition-normal), color var(--transition-normal);
 }
@@ -183,7 +184,8 @@ body {
 
 .container {
   display: flex;
-  height: 100vh;
+  height: 100vh;      /* Fallback for older browsers */
+  height: 100dvh;     /* Dynamic viewport height - adapts to mobile browser UI */
   width: 100%;
   overflow: hidden;
 }
@@ -765,6 +767,7 @@ body {
 /* Message Input Area */
 .message-input-container {
   padding: var(--spacing-lg);
+  padding-bottom: calc(var(--spacing-lg) + env(safe-area-inset-bottom));
   border-top: 1px solid var(--border-color);
   background-color: var(--bg-chat);
 }
@@ -1067,6 +1070,58 @@ textarea[readonly] {
 }
 
 /* ============================================
+   Sidebar Overlay (Mobile)
+   ============================================ */
+
+.sidebar-overlay {
+  display: none;
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.5);
+  z-index: 9;
+  opacity: 0;
+  transition: opacity var(--transition-normal);
+  backdrop-filter: blur(2px);
+}
+
+.sidebar-overlay.active {
+  display: block;
+  opacity: 1;
+}
+
+/* ============================================
+   Sidebar Close Button (Mobile)
+   ============================================ */
+
+.btn-close-sidebar {
+  padding: var(--spacing-sm);
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  border-radius: var(--radius-sm);
+  transition: all var(--transition-fast);
+  display: none;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  margin-left: auto;
+}
+
+.btn-close-sidebar:hover {
+  background-color: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.btn-close-sidebar i {
+  font-size: 20px;
+}
+
+/* ============================================
    Responsive Design
    ============================================ */
 
@@ -1104,7 +1159,7 @@ textarea[readonly] {
     top: 0;
     left: 0;
     bottom: 0;
-    z-index: var(--z-dropdown);
+    z-index: 10;
     transform: translateX(-100%);
     transition: transform var(--transition-normal);
     width: 85%;
@@ -1114,6 +1169,16 @@ textarea[readonly] {
 
   .sidebar.mobile-open {
     transform: translateX(0);
+  }
+
+  /* Show close button when sidebar is open on mobile */
+  .sidebar.mobile-open .btn-close-sidebar {
+    display: flex;
+  }
+
+  /* Prevent body scroll when sidebar is open */
+  body.sidebar-open {
+    overflow: hidden;
   }
 
   .main-content {

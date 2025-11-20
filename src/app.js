@@ -100,8 +100,37 @@ $('connectionModal').addEventListener('click', (e) => {
 // Mobile Menu
 // ============================================
 
+function openMobileMenu() {
+  const sidebar = $('sidebar');
+  const overlay = $('sidebarOverlay');
+
+  sidebar.classList.add('mobile-open');
+  overlay.classList.add('active');
+  document.body.classList.add('sidebar-open');
+
+  // Accessibility
+  sidebar.setAttribute('aria-hidden', 'false');
+}
+
+function closeMobileMenu() {
+  const sidebar = $('sidebar');
+  const overlay = $('sidebarOverlay');
+
+  sidebar.classList.remove('mobile-open');
+  overlay.classList.remove('active');
+  document.body.classList.remove('sidebar-open');
+
+  // Accessibility
+  sidebar.setAttribute('aria-hidden', 'true');
+}
+
 function toggleMobileMenu() {
-  $('sidebar').classList.toggle('mobile-open');
+  const sidebar = $('sidebar');
+  if (sidebar.classList.contains('mobile-open')) {
+    closeMobileMenu();
+  } else {
+    openMobileMenu();
+  }
 }
 
 // Show mobile menu button on small screens
@@ -111,12 +140,19 @@ function updateMobileMenuVisibility() {
     mobileMenuBtn.classList.remove('hidden');
   } else {
     mobileMenuBtn.classList.add('hidden');
-    $('sidebar').classList.remove('mobile-open');
+    closeMobileMenu(); // Use new close function
   }
 }
 
 window.addEventListener('resize', updateMobileMenuVisibility);
 updateMobileMenuVisibility();
+
+// Close sidebar with ESC key
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape' && $('sidebar').classList.contains('mobile-open')) {
+    closeMobileMenu();
+  }
+});
 
 // ============================================
 // Display Identity
@@ -462,7 +498,7 @@ $('btnSend').onclick = () => {
 
     // Close mobile menu if open
     if (window.innerWidth <= 768) {
-      $('sidebar').classList.remove('mobile-open');
+      closeMobileMenu();
     }
   }
 };
@@ -489,6 +525,16 @@ $('btnThemeToggle').onclick = () => {
 $('btnMobileMenu').onclick = () => {
   toggleMobileMenu();
 };
+
+// Close sidebar when clicking overlay
+$('sidebarOverlay').addEventListener('click', () => {
+  closeMobileMenu();
+});
+
+// Close sidebar with close button
+$('btnCloseSidebar').addEventListener('click', () => {
+  closeMobileMenu();
+});
 
 // ============================================
 // Initialization
