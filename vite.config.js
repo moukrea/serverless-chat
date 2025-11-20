@@ -1,5 +1,6 @@
 import { defineConfig } from 'vite';
-import { Buffer } from 'buffer';
+import { NodeGlobalsPolyfillPlugin } from '@esbuild-plugins/node-globals-polyfill';
+import { NodeModulesPolyfillPlugin } from '@esbuild-plugins/node-modules-polyfill';
 
 export default defineConfig({
   base: '/serverless-chat/',
@@ -7,17 +8,20 @@ export default defineConfig({
     outDir: 'dist',
     assetsDir: 'assets',
     sourcemap: false,
+    rollupOptions: {
+      plugins: [],
+    },
   },
   server: {
     port: 3000,
     open: true,
   },
-  define: {
-    global: 'globalThis',
-  },
   resolve: {
     alias: {
       buffer: 'buffer',
+      process: 'process/browser',
+      stream: 'stream-browserify',
+      util: 'util',
     },
   },
   optimizeDeps: {
@@ -25,6 +29,13 @@ export default defineConfig({
       define: {
         global: 'globalThis',
       },
+      plugins: [
+        NodeGlobalsPolyfillPlugin({
+          buffer: true,
+          process: true,
+        }),
+        NodeModulesPolyfillPlugin(),
+      ],
     },
   },
 });

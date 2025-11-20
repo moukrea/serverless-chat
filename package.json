@@ -9,10 +9,15 @@
   },
   "dependencies": {
     "buffer": "^6.0.3",
+    "process": "^0.11.10",
     "simple-peer": "^9.11.1",
+    "stream-browserify": "^3.0.0",
+    "util": "^0.12.5",
     "webtorrent": "^1.9.7"
   },
   "devDependencies": {
+    "@esbuild-plugins/node-globals-polyfill": "^0.2.3",
+    "@esbuild-plugins/node-modules-polyfill": "^0.2.2",
     "vite": "^5.0.0"
   }
 }
