@@ -104,7 +104,8 @@ class MessageRouter {
     // Is this message for us?
     const isForUs = this.isMessageForUs(message);
 
-    if (isForUs) {
+    // Deliver locally if for us AND we're not the originator (to avoid showing own messages)
+    if (isForUs && message.senderId !== this.identity.uuid) {
       this.stats.messagesDelivered++;
       await this.deliverMessage(message);
     }
@@ -211,7 +212,10 @@ class MessageRouter {
       ...message,
       ttl: message.ttl - 1,
       hopCount: message.hopCount + 1,
-      path: [...message.path, this.identity.uuid]
+      // Only add self to path if we're not the originator (avoid duplicate in path)
+      path: message.senderId === this.identity.uuid
+        ? message.path
+        : [...message.path, this.identity.uuid]
     };
 
     // Get all connected peers
