@@ -187,9 +187,6 @@ class MessageRouter {
     // Never forward if TTL exhausted
     if (message.ttl <= 1) return false;
 
-    // Don't forward back to sender
-    if (message.senderId === this.identity.uuid) return false;
-
     // Targeted messages
     if (message.targetPeerId) {
       // Only forward if not yet delivered to target
@@ -197,6 +194,7 @@ class MessageRouter {
     }
 
     // Broadcast messages - always forward (flood routing)
+    // Note: Safety handled by deduplication, loop prevention, and excludePeerId in forwardMessage
     return true;
   }
 
