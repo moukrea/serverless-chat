@@ -27,7 +27,8 @@ class DHTDiscovery {
           rtcConfig: ICE_CONFIG,
         },
       });
-      console.log('[DHT] WebTorrent client created with ICE config:', ICE_CONFIG);
+      console.log('[DHT] WebTorrent client created');
+      console.log('[DHT] ICE config:', ICE_CONFIG);
     }
 
     const infoHash = await createInfoHash(passphrase);

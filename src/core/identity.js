@@ -57,7 +57,21 @@ class IdentityManager {
       this.peerId = Math.random().toString(36).substr(2, 4).toUpperCase();
       this.keys = await generateKeyPair();
       await this.generateTokens();
+
+      // Self-approve: creator of swarm is automatically verified
+      this.approvedPeers[this.peerId] = {
+        publicKey: this.keys.publicKey,
+        status: 'full',
+        accessToken: this.accessToken,
+        refreshToken: this.refreshToken,
+        approvedAt: Date.now(),
+        approvedBy: 'self',
+      };
+
       this.saveIdentity();
+      this.saveApprovedPeers();
+
+      console.log('[Identity] Self-approved as swarm creator');
     }
   }
 
