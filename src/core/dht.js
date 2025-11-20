@@ -23,12 +23,14 @@ class DHTDiscovery {
 
     if (!this.client) {
       this.client = new WebTorrent({
-        tracker: {
-          rtcConfig: ICE_CONFIG,
-        },
+        // ICE configuration for WebRTC
+        rtcConfig: ICE_CONFIG,
+        // Enable DHT for peer discovery (doesn't require trackers)
+        dht: true,
+        // Trackers are optional - DHT is primary discovery method
+        tracker: true,
       });
-      console.log('[DHT] WebTorrent client created');
-      console.log('[DHT] ICE config:', ICE_CONFIG);
+      console.log('[DHT] WebTorrent client created (DHT enabled, STUN/TURN configured)');
     }
 
     const infoHash = await createInfoHash(passphrase);
