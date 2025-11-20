@@ -335,6 +335,7 @@ class App {
     } catch (error) {
       this.addMessage(`Failed to join swarm: ${error.message}`);
       setText('dhtStatus', '');
+      this.hideJoinModal();
     }
   }
 

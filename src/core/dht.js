@@ -13,6 +13,11 @@ class DHTDiscovery {
   }
 
   async join(passphrase) {
+    // Leave existing swarm first
+    if (this.activeTorrent) {
+      this.leave();
+    }
+
     this.passphrase = passphrase;
 
     if (!this.client) {
@@ -21,6 +26,13 @@ class DHTDiscovery {
 
     const infoHash = await createInfoHash(passphrase);
     const magnetURI = `magnet:?xt=urn:btih:${infoHash}&dn=p2pmesh`;
+
+    // Check if torrent already exists
+    const existingTorrent = this.client.get(infoHash);
+    if (existingTorrent) {
+      this.activeTorrent = existingTorrent;
+      return Promise.resolve(existingTorrent);
+    }
 
     return new Promise((resolve, reject) => {
       this.client.add(magnetURI, { announce: [] }, torrent => {
