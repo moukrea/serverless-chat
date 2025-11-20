@@ -1,8 +1,13 @@
 /**
  * Application entry point
  */
+import { Buffer } from 'buffer';
 import './styles/main.css';
 import app from './ui/app.js';
+
+// Polyfill Buffer for WebTorrent
+window.Buffer = Buffer;
+globalThis.Buffer = Buffer;
 
 // Initialize the application
 (async () => {

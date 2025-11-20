@@ -8,6 +8,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "buffer": "^6.0.3",
     "simple-peer": "^9.11.1",
     "webtorrent": "^1.9.7"
   },
