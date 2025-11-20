@@ -31,7 +31,11 @@ mesh.onPeerDisconnect = (uuid) => {
 };
 
 mesh.onPeerUpdate = (uuid, displayName) => {
-  addMessage(`Peer renamed to ${displayName}`, 'system');
+  const peerData = mesh.peers.get(uuid);
+  // Only show system message if peer changed their own name (not custom rename)
+  if (peerData) {
+    addMessage(`${displayName} changed their display name`, 'system');
+  }
   updatePeersList();
 };
 
@@ -54,20 +58,63 @@ function updatePeersList() {
   }
 
   peersList.innerHTML = peers
-    .map(
-      (peer) => `
+    .map((peer) => {
+      // Determine latency badge class
+      let latencyClass = 'latency-excellent';
+      let latencyText = 'Unknown';
+      if (peer.latency !== null && peer.latency !== undefined) {
+        latencyText = `${peer.latency}ms`;
+        if (peer.latency < 100) latencyClass = 'latency-excellent';
+        else if (peer.latency < 200) latencyClass = 'latency-good';
+        else if (peer.latency < 500) latencyClass = 'latency-fair';
+        else latencyClass = 'latency-poor';
+      }
+
+      // Format uptime
+      const uptimeText = peer.uptime > 60 ? `${Math.floor(peer.uptime / 60)}m` : `${peer.uptime}s`;
+
+      return `
     <div class="peer-item" data-uuid="${peer.uuid}">
+      <div class="peer-tooltip">
+        <div class="tooltip-row">
+          <span class="tooltip-label">Original Name:</span>
+          <span class="tooltip-value">${peer.originalDisplayName}</span>
+        </div>
+        ${peer.displayName !== peer.originalDisplayName ? `
+        <div class="tooltip-row">
+          <span class="tooltip-label">Your Rename:</span>
+          <span class="tooltip-value">${peer.displayName}</span>
+        </div>
+        ` : ''}
+        <div class="tooltip-row">
+          <span class="tooltip-label">UUID:</span>
+          <span class="tooltip-value">${peer.uuid.substring(0, 8)}</span>
+        </div>
+        <div class="tooltip-row">
+          <span class="tooltip-label">Quality Score:</span>
+          <span class="tooltip-value">${peer.quality}/100</span>
+        </div>
+        <div class="tooltip-row">
+          <span class="tooltip-label">Uptime:</span>
+          <span class="tooltip-value">${uptimeText}</span>
+        </div>
+      </div>
       <div class="peer-status"></div>
       <div class="peer-info">
         <div class="peer-name" data-uuid="${peer.uuid}">
           <span>${peer.displayName}</span>
           <i class="ti ti-edit"></i>
         </div>
-        <div class="peer-uuid">${peer.uuid.substring(0, 16)}...</div>
+        <div class="peer-stats">
+          <div class="peer-uuid">${peer.uuid.substring(0, 8)}...</div>
+          ${peer.latency !== null && peer.latency !== undefined ?
+            `<div class="latency-badge ${latencyClass}">${latencyText}</div>` : ''}
+          <div class="quality-badge">${peer.quality}</div>
+        </div>
       </div>
     </div>
-  `
-    )
+  `;
+    })
     .join('');
 
   // Add click handlers for renaming
