@@ -13,11 +13,123 @@ const mesh = new MeshNetwork(identity);
 // Helper function
 const $ = (id) => document.getElementById(id);
 
-// Display identity
-$('displayName').textContent = identity.displayName;
-$('userUUID').textContent = identity.uuid;
+// ============================================
+// Theme Management
+// ============================================
 
-// Setup mesh event handlers
+function initTheme() {
+  // Check localStorage first, then system preference
+  const savedTheme = localStorage.getItem('theme');
+  const systemPrefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+  const theme = savedTheme || (systemPrefersDark ? 'dark' : 'light');
+
+  setTheme(theme);
+}
+
+function setTheme(theme) {
+  document.documentElement.setAttribute('data-theme', theme);
+  localStorage.setItem('theme', theme);
+
+  // Update theme toggle icon
+  const icon = $('btnThemeToggle').querySelector('i');
+  if (theme === 'dark') {
+    icon.className = 'ti ti-sun';
+  } else {
+    icon.className = 'ti ti-moon';
+  }
+}
+
+function toggleTheme() {
+  const currentTheme = document.documentElement.getAttribute('data-theme') || 'dark';
+  const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
+  setTheme(newTheme);
+}
+
+// ============================================
+// Avatar Generation
+// ============================================
+
+function getInitials(name) {
+  if (!name || name.trim() === '') return '??';
+
+  const words = name.trim().split(/\s+/);
+  if (words.length === 1) {
+    return words[0].substring(0, 2).toUpperCase();
+  }
+  return (words[0][0] + words[words.length - 1][0]).toUpperCase();
+}
+
+function updateUserAvatar() {
+  const avatar = $('userAvatar');
+  avatar.textContent = getInitials(identity.displayName);
+}
+
+// ============================================
+// Modal Management
+// ============================================
+
+function openConnectionModal() {
+  $('connectionModal').classList.remove('hidden');
+  // Reset modal state
+  $('connectionChoice').classList.remove('hidden');
+  $('initiatorFlow').classList.add('hidden');
+  $('joinerFlow').classList.add('hidden');
+}
+
+function closeConnectionModal() {
+  $('connectionModal').classList.add('hidden');
+  // Reset all flows
+  $('connectionChoice').classList.remove('hidden');
+  $('initiatorFlow').classList.add('hidden');
+  $('joinerFlow').classList.add('hidden');
+  $('joinerAnswerStep').classList.add('hidden');
+
+  // Clear inputs
+  $('offerInput').value = '';
+  $('answerInput').value = '';
+}
+
+// Close modal when clicking outside
+$('connectionModal').addEventListener('click', (e) => {
+  if (e.target === $('connectionModal')) {
+    closeConnectionModal();
+  }
+});
+
+// ============================================
+// Mobile Menu
+// ============================================
+
+function toggleMobileMenu() {
+  $('sidebar').classList.toggle('mobile-open');
+}
+
+// Show mobile menu button on small screens
+function updateMobileMenuVisibility() {
+  const mobileMenuBtn = $('btnMobileMenu');
+  if (window.innerWidth <= 768) {
+    mobileMenuBtn.classList.remove('hidden');
+  } else {
+    mobileMenuBtn.classList.add('hidden');
+    $('sidebar').classList.remove('mobile-open');
+  }
+}
+
+window.addEventListener('resize', updateMobileMenuVisibility);
+updateMobileMenuVisibility();
+
+// ============================================
+// Display Identity
+// ============================================
+
+$('displayName').textContent = identity.displayName;
+$('userUUID').textContent = identity.uuid.substring(0, 16) + '...';
+updateUserAvatar();
+
+// ============================================
+// Mesh Event Handlers
+// ============================================
+
 mesh.onPeerConnect = (uuid, displayName) => {
   addMessage(`${displayName} joined the mesh`, 'system');
   updatePeersList();
@@ -44,7 +156,10 @@ mesh.onMessage = (uuid, displayName, text) => {
   addMessage(`${peerName}: ${text}`, 'peer', uuid);
 };
 
-// Update peers list UI
+// ============================================
+// Update Peers List UI
+// ============================================
+
 function updatePeersList() {
   const peers = mesh.getConnectedPeers();
   const peersList = $('peersList');
@@ -73,47 +188,52 @@ function updatePeersList() {
       // Format uptime
       const uptimeText = peer.uptime > 60 ? `${Math.floor(peer.uptime / 60)}m` : `${peer.uptime}s`;
 
+      const initials = getInitials(peer.displayName);
+
       return `
-    <div class="peer-item" data-uuid="${peer.uuid}">
-      <div class="peer-tooltip">
-        <div class="tooltip-row">
-          <span class="tooltip-label">Original Name:</span>
-          <span class="tooltip-value">${peer.originalDisplayName}</span>
+        <div class="peer-item" data-uuid="${peer.uuid}">
+          <div class="peer-tooltip">
+            <div class="tooltip-row">
+              <span class="tooltip-label">Original Name:</span>
+              <span class="tooltip-value">${peer.originalDisplayName}</span>
+            </div>
+            ${peer.displayName !== peer.originalDisplayName ? `
+            <div class="tooltip-row">
+              <span class="tooltip-label">Your Rename:</span>
+              <span class="tooltip-value">${peer.displayName}</span>
+            </div>
+            ` : ''}
+            <div class="tooltip-row">
+              <span class="tooltip-label">UUID:</span>
+              <span class="tooltip-value">${peer.uuid.substring(0, 8)}</span>
+            </div>
+            <div class="tooltip-row">
+              <span class="tooltip-label">Quality Score:</span>
+              <span class="tooltip-value">${peer.quality}/100</span>
+            </div>
+            <div class="tooltip-row">
+              <span class="tooltip-label">Uptime:</span>
+              <span class="tooltip-value">${uptimeText}</span>
+            </div>
+          </div>
+          <div class="peer-avatar">
+            ${initials}
+            <div class="peer-status"></div>
+          </div>
+          <div class="peer-info">
+            <div class="peer-name" data-uuid="${peer.uuid}">
+              <span>${peer.displayName}</span>
+              <i class="ti ti-edit"></i>
+            </div>
+            <div class="peer-stats">
+              <div class="peer-uuid">${peer.uuid.substring(0, 8)}...</div>
+              ${peer.latency !== null && peer.latency !== undefined ?
+                `<div class="latency-badge ${latencyClass}">${latencyText}</div>` : ''}
+              <div class="quality-badge">${peer.quality}</div>
+            </div>
+          </div>
         </div>
-        ${peer.displayName !== peer.originalDisplayName ? `
-        <div class="tooltip-row">
-          <span class="tooltip-label">Your Rename:</span>
-          <span class="tooltip-value">${peer.displayName}</span>
-        </div>
-        ` : ''}
-        <div class="tooltip-row">
-          <span class="tooltip-label">UUID:</span>
-          <span class="tooltip-value">${peer.uuid.substring(0, 8)}</span>
-        </div>
-        <div class="tooltip-row">
-          <span class="tooltip-label">Quality Score:</span>
-          <span class="tooltip-value">${peer.quality}/100</span>
-        </div>
-        <div class="tooltip-row">
-          <span class="tooltip-label">Uptime:</span>
-          <span class="tooltip-value">${uptimeText}</span>
-        </div>
-      </div>
-      <div class="peer-status"></div>
-      <div class="peer-info">
-        <div class="peer-name" data-uuid="${peer.uuid}">
-          <span>${peer.displayName}</span>
-          <i class="ti ti-edit"></i>
-        </div>
-        <div class="peer-stats">
-          <div class="peer-uuid">${peer.uuid.substring(0, 8)}...</div>
-          ${peer.latency !== null && peer.latency !== undefined ?
-            `<div class="latency-badge ${latencyClass}">${latencyText}</div>` : ''}
-          <div class="quality-badge">${peer.quality}</div>
-        </div>
-      </div>
-    </div>
-  `;
+      `;
     })
     .join('');
 
@@ -129,7 +249,10 @@ function updatePeersList() {
   });
 }
 
-// Rename peer locally
+// ============================================
+// Rename Peer Locally
+// ============================================
+
 function renamePeer(uuid, currentName, originalName) {
   const newName = prompt(
     `Rename peer locally:\n\nOriginal name: ${originalName}\nCurrent custom name: ${currentName === originalName ? '(none)' : currentName}`,
@@ -147,21 +270,33 @@ function renamePeer(uuid, currentName, originalName) {
   }
 }
 
-// Edit own display name
+// ============================================
+// Edit Own Display Name
+// ============================================
+
 $('btnEditName').onclick = () => {
   const newName = prompt('Enter your new display name:', identity.displayName);
   if (newName && newName.trim()) {
     identity.setDisplayName(newName.trim());
     $('displayName').textContent = identity.displayName;
+    updateUserAvatar();
     mesh.broadcastNameChange();
     addMessage(`You changed your name to ${identity.displayName}`, 'system');
   }
 };
 
-// Also allow clicking on the name itself
-$('displayName').onclick = () => $('btnEditName').click();
+// Also allow clicking on the identity section
+$('userIdentity').onclick = (e) => {
+  // Don't trigger if clicking the edit button
+  if (!e.target.closest('.btn-edit-identity')) {
+    $('btnEditName').click();
+  }
+};
 
-// Add message to chat
+// ============================================
+// Add Message to Chat
+// ============================================
+
 function addMessage(text, type = 'sent', uuid = null) {
   const div = document.createElement('div');
   div.className = `message ${type}`;
@@ -173,14 +308,29 @@ function addMessage(text, type = 'sent', uuid = null) {
   $('messages').scrollTop = $('messages').scrollHeight;
 }
 
-// Enable chat when at least one peer connected
+// ============================================
+// Enable Chat
+// ============================================
+
 function enableChat() {
   $('messageInput').disabled = false;
   $('btnSend').disabled = false;
 }
 
-// Event Handlers
+// ============================================
+// Connection Event Handlers
+// ============================================
+
+$('btnNewConnection').onclick = () => {
+  openConnectionModal();
+};
+
+$('btnCloseModal').onclick = () => {
+  closeConnectionModal();
+};
+
 $('btnInvite').onclick = async () => {
+  $('connectionChoice').classList.add('hidden');
   $('btnInvite').disabled = true;
   $('initiatorFlow').classList.remove('hidden');
 
@@ -206,6 +356,7 @@ $('btnInvite').onclick = async () => {
 };
 
 $('btnJoin').onclick = () => {
+  $('connectionChoice').classList.add('hidden');
   $('btnJoin').disabled = true;
   $('joinerFlow').classList.remove('hidden');
 
@@ -289,30 +440,62 @@ $('btnAcceptAnswer').onclick = () => {
     // Clear the input
     $('answerInput').value = '';
 
-    // Hide the flow after connection attempt
+    // Hide the modal after connection attempt
     setTimeout(() => {
-      $('initiatorFlow').classList.add('hidden');
+      closeConnectionModal();
     }, 2000);
   } catch (e) {
     alert('Invalid response format: ' + e.message);
   }
 };
 
-// Send message
+// ============================================
+// Send Message
+// ============================================
+
 $('btnSend').onclick = () => {
   const text = $('messageInput').value.trim();
   if (text && mesh.getConnectedPeers().length > 0) {
     mesh.sendMessage(text);
     addMessage(`You: ${text}`, 'sent');
     $('messageInput').value = '';
+
+    // Close mobile menu if open
+    if (window.innerWidth <= 768) {
+      $('sidebar').classList.remove('mobile-open');
+    }
   }
 };
 
 $('messageInput').onkeypress = (e) => {
-  if (e.key === 'Enter') {
+  if (e.key === 'Enter' && !e.shiftKey) {
+    e.preventDefault();
     $('btnSend').click();
   }
 };
+
+// ============================================
+// Theme Toggle
+// ============================================
+
+$('btnThemeToggle').onclick = () => {
+  toggleTheme();
+};
+
+// ============================================
+// Mobile Menu Toggle
+// ============================================
+
+$('btnMobileMenu').onclick = () => {
+  toggleMobileMenu();
+};
+
+// ============================================
+// Initialization
+// ============================================
+
+// Initialize theme
+initTheme();
 
 // Disable send button initially
 $('messageInput').disabled = true;
@@ -320,4 +503,4 @@ $('btnSend').disabled = true;
 
 // Welcome message
 addMessage('Welcome! Your identity has been created.', 'system');
-addMessage('Create an invitation or join with a code to connect to peers.', 'system');
+addMessage('Click "New Connection" to connect to peers.', 'system');
