@@ -1,7 +1,7 @@
 import { defineConfig } from 'vite';
 
 export default defineConfig({
-  base: '/chat/',
+  base: '/serverless-chat/',
   build: {
     outDir: 'dist',
     assetsDir: 'assets',
