@@ -64,8 +64,19 @@ $('btnInvite').onclick = async () => {
   $('btnJoin').disabled = true;
   $('initiatorFlow').classList.remove('hidden');
 
+  // Show loader
+  $('offerLoader').classList.remove('hidden');
+  $('offerOutput').classList.add('hidden');
+  $('btnCopyOffer').classList.add('hidden');
+
   const offer = await p2p.createOffer();
+
+  // Hide loader, show code
+  $('offerLoader').classList.add('hidden');
   $('offerOutput').value = offer;
+  $('offerOutput').classList.remove('hidden');
+  $('btnCopyOffer').classList.remove('hidden');
+
   addMessage('Offer generated. Share it with your peer.', 'system');
 };
 
@@ -79,8 +90,10 @@ $('btnJoin').onclick = () => {
 $('btnCopyOffer').onclick = async () => {
   try {
     await navigator.clipboard.writeText($('offerOutput').value);
-    $('btnCopyOffer').textContent = '✅ Copied!';
-    setTimeout(() => ($('btnCopyOffer').textContent = '📋 Copy'), 2000);
+    $('btnCopyOffer').innerHTML = '<i class="ti ti-check"></i><span>Copied!</span>';
+    setTimeout(() => {
+      $('btnCopyOffer').innerHTML = '<i class="ti ti-copy"></i><span>Copy Code</span>';
+    }, 2000);
   } catch (e) {
     $('offerOutput').select();
     alert('Please copy manually (Ctrl+C)');
@@ -95,9 +108,20 @@ $('btnProcessOffer').onclick = async () => {
   }
 
   try {
-    const answer = await p2p.acceptOffer(offer);
-    $('answerOutput').value = answer;
+    // Show joiner answer step with loader
     $('joinerAnswerStep').classList.remove('hidden');
+    $('answerLoader').classList.remove('hidden');
+    $('answerOutput').classList.add('hidden');
+    $('btnCopyAnswer').classList.add('hidden');
+
+    const answer = await p2p.acceptOffer(offer);
+
+    // Hide loader, show code
+    $('answerLoader').classList.add('hidden');
+    $('answerOutput').value = answer;
+    $('answerOutput').classList.remove('hidden');
+    $('btnCopyAnswer').classList.remove('hidden');
+
     addMessage('Answer generated. Share it with your peer.', 'system');
   } catch (e) {
     alert('Invalid offer format');
@@ -107,8 +131,10 @@ $('btnProcessOffer').onclick = async () => {
 $('btnCopyAnswer').onclick = async () => {
   try {
     await navigator.clipboard.writeText($('answerOutput').value);
-    $('btnCopyAnswer').textContent = '✅ Copied!';
-    setTimeout(() => ($('btnCopyAnswer').textContent = '📋 Copy'), 2000);
+    $('btnCopyAnswer').innerHTML = '<i class="ti ti-check"></i><span>Copied!</span>';
+    setTimeout(() => {
+      $('btnCopyAnswer').innerHTML = '<i class="ti ti-copy"></i><span>Copy Code</span>';
+    }, 2000);
   } catch (e) {
     $('answerOutput').select();
     alert('Please copy manually (Ctrl+C)');

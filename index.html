@@ -3,54 +3,112 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Simple P2P Chat</title>
+    <title>P2P Chat</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css">
   </head>
   <body>
-    <h1>💬 Simple P2P Chat</h1>
+    <div class="container">
+      <header>
+        <i class="ti ti-message-circle"></i>
+        <h1>P2P Chat</h1>
+      </header>
 
-    <div id="setup">
-      <div class="panel">
-        <h3>Connect</h3>
-        <button id="btnInvite" class="primary">Create Invitation</button>
-        <button id="btnJoin" class="secondary">Join with Code</button>
-      </div>
+      <div id="setup">
+        <div class="panel">
+          <h3>Connect to Peer</h3>
+          <div class="button-group">
+            <button id="btnInvite" class="btn-primary">
+              <i class="ti ti-user-plus"></i>
+              <span>Create Invitation</span>
+            </button>
+            <button id="btnJoin" class="btn-secondary">
+              <i class="ti ti-login"></i>
+              <span>Join with Code</span>
+            </button>
+          </div>
+        </div>
 
-      <div id="initiatorFlow" class="hidden">
-        <div class="panel">
-          <h3>Step 1: Copy & Share This Code</h3>
-          <textarea id="offerOutput" readonly></textarea>
-          <button id="btnCopyOffer">📋 Copy</button>
-        </div>
-        <div class="panel">
-          <h3>Step 2: Paste Response Code</h3>
-          <textarea id="answerInput" placeholder="Paste the response here..."></textarea>
-          <button id="btnAcceptAnswer">✅ Connect</button>
-        </div>
-      </div>
-
-      <div id="joinerFlow" class="hidden">
-        <div class="panel">
-          <h3>Step 1: Paste Invitation Code</h3>
-          <textarea id="offerInput" placeholder="Paste the invitation here..."></textarea>
-          <button id="btnProcessOffer">Generate Response</button>
-        </div>
-        <div id="joinerAnswerStep" class="hidden">
+        <div id="initiatorFlow" class="hidden">
           <div class="panel">
-            <h3>Step 2: Copy & Share This Response</h3>
-            <textarea id="answerOutput" readonly></textarea>
-            <button id="btnCopyAnswer">📋 Copy</button>
+            <div class="panel-header">
+              <i class="ti ti-copy"></i>
+              <h3>Share Invitation Code</h3>
+            </div>
+            <div class="code-container">
+              <div id="offerLoader" class="loader">
+                <div class="spinner"></div>
+                <p>Generating invitation code...</p>
+              </div>
+              <textarea id="offerOutput" readonly class="hidden"></textarea>
+            </div>
+            <button id="btnCopyOffer" class="btn-secondary hidden">
+              <i class="ti ti-copy"></i>
+              <span>Copy Code</span>
+            </button>
+          </div>
+
+          <div class="panel">
+            <div class="panel-header">
+              <i class="ti ti-arrow-back"></i>
+              <h3>Paste Response Code</h3>
+            </div>
+            <textarea id="answerInput" placeholder="Paste the response code here..."></textarea>
+            <button id="btnAcceptAnswer" class="btn-primary">
+              <i class="ti ti-plug-connected"></i>
+              <span>Connect</span>
+            </button>
+          </div>
+        </div>
+
+        <div id="joinerFlow" class="hidden">
+          <div class="panel">
+            <div class="panel-header">
+              <i class="ti ti-clipboard"></i>
+              <h3>Paste Invitation Code</h3>
+            </div>
+            <textarea id="offerInput" placeholder="Paste the invitation code here..."></textarea>
+            <button id="btnProcessOffer" class="btn-primary">
+              <i class="ti ti-key"></i>
+              <span>Generate Response</span>
+            </button>
+          </div>
+
+          <div id="joinerAnswerStep" class="hidden">
+            <div class="panel">
+              <div class="panel-header">
+                <i class="ti ti-send"></i>
+                <h3>Share Response Code</h3>
+              </div>
+              <div class="code-container">
+                <div id="answerLoader" class="loader">
+                  <div class="spinner"></div>
+                  <p>Generating response code...</p>
+                </div>
+                <textarea id="answerOutput" readonly class="hidden"></textarea>
+              </div>
+              <button id="btnCopyAnswer" class="btn-secondary hidden">
+                <i class="ti ti-copy"></i>
+                <span>Copy Code</span>
+              </button>
+            </div>
           </div>
         </div>
       </div>
-    </div>
 
-    <div id="chat" class="hidden">
-      <div class="panel">
-        <h3>Chat</h3>
-        <div id="messages"></div>
-        <div class="input-row">
-          <input type="text" id="messageInput" placeholder="Type a message..." />
-          <button id="btnSend">Send</button>
+      <div id="chat" class="hidden">
+        <div class="panel chat-panel">
+          <div class="panel-header">
+            <i class="ti ti-messages"></i>
+            <h3>Chat</h3>
+            <div class="status-indicator connected"></div>
+          </div>
+          <div id="messages"></div>
+          <div class="input-row">
+            <input type="text" id="messageInput" placeholder="Type a message..." />
+            <button id="btnSend" class="btn-primary">
+              <i class="ti ti-send"></i>
+            </button>
+          </div>
         </div>
       </div>
     </div>
