@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>P2P Mesh Network</title>
+  </head>
+  <body>
+    <h1>🕸️ P2P Mesh Network</h1>
+    <p class="subtitle">JWT Auth • Two-Stage Approval • Auto-Renewal</p>
+
+    <!-- Identity Panel -->
+    <div class="panel">
+      <h3>Your Identity</h3>
+      <div id="myId">-</div>
+      <div id="tokenStatus" class="token-status"></div>
+      <div id="dhtStatus" style="text-align: center; font-size: 12px; color: #888; margin: 10px 0"></div>
+      <div style="text-align: center">
+        <button id="btnJoinSwarm" class="secondary">🌐 Join Swarm</button>
+        <button id="btnLeaveSwarm" class="danger small hidden">Leave</button>
+      </div>
+      <div style="text-align: center; margin-top: 8px">
+        <button id="btnClearStorage" class="danger small">Clear All Data</button>
+      </div>
+    </div>
+
+    <!-- Pending Verifications -->
+    <div class="panel hidden" id="pendingPanel">
+      <h3>⏳ Pending Verifications</h3>
+      <div id="pendingList"></div>
+    </div>
+
+    <!-- Peers Panel -->
+    <div class="panel">
+      <h3>Mesh Peers (<span id="peerCount">0</span>)</h3>
+      <div id="peerList" class="peer-list">
+        <div style="color: #666; text-align: center; padding: 20px">No peers connected yet</div>
+      </div>
+    </div>
+
+    <!-- Chat Panel -->
+    <div class="panel">
+      <div class="tabs">
+        <button class="tab active" id="tabMain" onclick="switchTab('main')">💬 Main Chat</button>
+        <button class="tab" id="tabVerification" onclick="switchTab('verification')">🔐 Verification</button>
+      </div>
+
+      <div id="mainChat">
+        <div id="messages" class="chat-container"></div>
+        <div class="flex">
+          <input type="text" id="messageInput" placeholder="Type a message..." />
+          <button id="btnSend">Send</button>
+        </div>
+      </div>
+
+      <div id="verificationChat" class="hidden">
+        <div id="verificationMessages" class="chat-container"></div>
+        <div class="flex">
+          <input type="text" id="verificationInput" placeholder="Verification message..." />
+          <button id="btnSendVerification">Send</button>
+        </div>
+        <p style="font-size: 11px; color: #888; margin-top: 5px">
+          Use this channel to verify new peers before granting full access.
+        </p>
+      </div>
+    </div>
+
+    <!-- Join Swarm Modal -->
+    <div id="joinModal" class="modal hidden">
+      <div class="modal-content">
+        <h3>🌐 Join Swarm</h3>
+        <p>Enter a shared passphrase:</p>
+        <input type="text" id="swarmPassphrase" placeholder="e.g., team-alpha-2024" />
+        <p style="font-size: 12px; color: #888; margin-top: 10px">
+          New peers require verification from existing members before gaining full access.
+        </p>
+        <div style="margin-top: 15px">
+          <button id="btnStartSwarm" class="secondary">🔍 Join</button>
+          <button id="btnCancelJoin" class="danger">Cancel</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Verification Modal -->
+    <div id="verifyModal" class="modal hidden">
+      <div class="modal-content">
+        <h3>🔐 Verify Peer: <span id="verifyPeerId"></span></h3>
+        <p>This peer is in probation. Chat with them to verify their identity.</p>
+
+        <div class="verification-chat">
+          <div id="verifyModalMessages" class="chat-container"></div>
+          <div class="flex">
+            <input type="text" id="verifyModalInput" placeholder="Ask verification questions..." />
+            <button id="btnVerifyModalSend">Send</button>
+          </div>
+        </div>
+
+        <p style="font-size: 12px; color: #888">
+          Suggested questions: Project name? Manager's name? Office location?
+        </p>
+
+        <div style="margin-top: 15px">
+          <button id="btnGrantAccess" class="secondary">✓ Grant Full Access</button>
+          <button id="btnRejectPeer" class="danger">✗ Reject</button>
+          <button id="btnCloseVerify">Close</button>
+        </div>
+      </div>
+    </div>
+
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>

@@ -1,0 +1,17 @@
+{
+  "name": "p2p-mesh-chat",
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "simple-peer": "^9.11.1",
+    "webtorrent": "^1.9.7"
+  },
+  "devDependencies": {
+    "vite": "^5.0.0"
+  }
+}
