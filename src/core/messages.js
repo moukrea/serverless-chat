@@ -240,20 +240,56 @@ class MessageHandler {
         refreshToken: identity.refreshToken,
       });
     } else {
-      this.pendingVerifications.set(requesterId, {
-        wire,
-        publicKey: message.publicKey,
-        accessToken: message.accessToken,
-        refreshToken: message.refreshToken,
-        timestamp: Date.now(),
-      });
+      // Bootstrap scenario: if we have no verified peers, auto-grant probation
+      const hasVerifiedPeers = Object.values(identity.approvedPeers).some(
+        peer => peer.status === 'full'
+      );
 
-      if (this.onSystemMessageCallback) {
-        this.onSystemMessageCallback(`${requesterId} requesting to join`);
-      }
+      if (!hasVerifiedPeers) {
+        console.log('[Bootstrap] No verified peers exist, auto-granting probation to', requesterId);
 
-      if (this.onPeerStatusChangeCallback) {
-        this.onPeerStatusChangeCallback();
+        identity.approvePeer(requesterId, {
+          publicKey: message.publicKey,
+          status: 'probation',
+          accessToken: message.accessToken,
+          refreshToken: message.refreshToken,
+          approvedBy: identity.peerId,
+        });
+
+        dht.sendViaWire(wire, {
+          type: 'probation-granted',
+          publicKey: identity.keys.publicKey,
+          accessToken: identity.accessToken,
+          refreshToken: identity.refreshToken,
+        });
+
+        if (this.onSystemMessageCallback) {
+          this.onSystemMessageCallback(
+            `${requesterId} auto-granted probation (bootstrap mode) - verify before granting full access`,
+            'verification'
+          );
+        }
+
+        if (this.onPeerStatusChangeCallback) {
+          this.onPeerStatusChangeCallback();
+        }
+      } else {
+        // Normal scenario: add to pending for manual verification
+        this.pendingVerifications.set(requesterId, {
+          wire,
+          publicKey: message.publicKey,
+          accessToken: message.accessToken,
+          refreshToken: message.refreshToken,
+          timestamp: Date.now(),
+        });
+
+        if (this.onSystemMessageCallback) {
+          this.onSystemMessageCallback(`${requesterId} requesting to join`);
+        }
+
+        if (this.onPeerStatusChangeCallback) {
+          this.onPeerStatusChangeCallback();
+        }
       }
     }
   }

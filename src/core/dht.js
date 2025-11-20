@@ -3,6 +3,7 @@
  */
 import WebTorrent from 'webtorrent';
 import { createInfoHash } from '../utils/crypto.js';
+import { ICE_CONFIG } from './peer.js';
 
 class DHTDiscovery {
   constructor() {
@@ -21,7 +22,12 @@ class DHTDiscovery {
     this.passphrase = passphrase;
 
     if (!this.client) {
-      this.client = new WebTorrent();
+      this.client = new WebTorrent({
+        tracker: {
+          rtcConfig: ICE_CONFIG,
+        },
+      });
+      console.log('[DHT] WebTorrent client created with ICE config:', ICE_CONFIG);
     }
 
     const infoHash = await createInfoHash(passphrase);

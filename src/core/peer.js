@@ -3,7 +3,7 @@
  */
 import SimplePeer from 'simple-peer';
 
-const ICE_CONFIG = {
+export const ICE_CONFIG = {
   iceServers: [
     { urls: 'stun:stun.l.google.com:19302' },
     { urls: 'stun:stun1.l.google.com:19302' },
