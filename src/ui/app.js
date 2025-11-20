@@ -5,7 +5,7 @@ import identity from '../core/identity.js';
 import peerManager from '../core/peer.js';
 import dht from '../core/dht.js';
 import messageHandler from '../core/messages.js';
-import { $, show, hide, setText, setHTML, getValue, clearValue, addClass, removeClass } from './dom.js';
+import { $, show, hide, setText, setHTML, getValue, setValue, clearValue, addClass, removeClass } from './dom.js';
 
 class App {
   constructor() {
