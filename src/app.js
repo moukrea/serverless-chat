@@ -330,18 +330,116 @@ $('userIdentity').onclick = (e) => {
 };
 
 // ============================================
+// Message Formatting Helpers
+// ============================================
+
+function formatTimestamp() {
+  const now = new Date();
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  const messageDate = new Date(now);
+  messageDate.setHours(0, 0, 0, 0);
+
+  // Format time (always shown)
+  const hours = now.getHours().toString().padStart(2, '0');
+  const minutes = now.getMinutes().toString().padStart(2, '0');
+  const time = `${hours}:${minutes}`;
+
+  // If not today, add date
+  if (messageDate.getTime() !== today.getTime()) {
+    const month = (now.getMonth() + 1).toString().padStart(2, '0');
+    const day = now.getDate().toString().padStart(2, '0');
+    const year = now.getFullYear();
+    return `${month}/${day}/${year} ${time}`;
+  }
+
+  return time;
+}
+
+function createMessageAvatar(author, type) {
+  const avatar = document.createElement('div');
+  avatar.className = 'message-avatar';
+
+  if (type === 'peer') {
+    avatar.classList.add('peer-avatar-msg');
+  }
+
+  avatar.textContent = getInitials(author);
+  return avatar;
+}
+
+// ============================================
 // Add Message to Chat
 // ============================================
 
 function addMessage(text, type = 'sent', uuid = null) {
-  const div = document.createElement('div');
-  div.className = `message ${type}`;
-  div.textContent = text;
-  if (uuid) {
-    div.dataset.uuid = uuid;
+  const messagesContainer = $('messages');
+
+  // System messages - keep simple centered format
+  if (type === 'system') {
+    const div = document.createElement('div');
+    div.className = 'message system';
+    div.textContent = text;
+    messagesContainer.appendChild(div);
+    messagesContainer.scrollTop = messagesContainer.scrollHeight;
+    return;
   }
-  $('messages').appendChild(div);
-  $('messages').scrollTop = $('messages').scrollHeight;
+
+  // Parse author and message text
+  let author = 'Unknown';
+  let messageText = text;
+
+  // Check if text contains "Author: message" format
+  const colonIndex = text.indexOf(': ');
+  if (colonIndex > 0) {
+    author = text.substring(0, colonIndex);
+    messageText = text.substring(colonIndex + 2);
+  }
+
+  // Create message group
+  const messageGroup = document.createElement('div');
+  messageGroup.className = 'message-group';
+  if (uuid) {
+    messageGroup.dataset.uuid = uuid;
+  }
+
+  // Create avatar
+  const avatar = createMessageAvatar(author, type);
+
+  // Create message content container
+  const content = document.createElement('div');
+  content.className = 'message-content';
+
+  // Create message header (author + timestamp)
+  const header = document.createElement('div');
+  header.className = 'message-header';
+
+  const authorSpan = document.createElement('span');
+  authorSpan.className = 'message-author';
+  authorSpan.textContent = author;
+
+  const timestamp = document.createElement('span');
+  timestamp.className = 'message-timestamp';
+  timestamp.textContent = formatTimestamp();
+
+  header.appendChild(authorSpan);
+  header.appendChild(timestamp);
+
+  // Create message text
+  const textDiv = document.createElement('div');
+  textDiv.className = 'message-text';
+  textDiv.textContent = messageText;
+
+  // Assemble message
+  content.appendChild(header);
+  content.appendChild(textDiv);
+
+  messageGroup.appendChild(avatar);
+  messageGroup.appendChild(content);
+
+  messagesContainer.appendChild(messageGroup);
+  messagesContainer.scrollTop = messagesContainer.scrollHeight;
 }
 
 // ============================================
