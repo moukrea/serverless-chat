@@ -1,6 +1,6 @@
 {
-  "name": "p2p-mesh-chat",
-  "version": "1.0.0",
+  "name": "simple-p2p-chat",
+  "version": "2.0.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -8,13 +8,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "buffer": "^6.0.3",
-    "process": "^0.11.10",
-    "simple-peer": "^9.11.1",
-    "stream-browserify": "^3.0.0",
-    "util": "^0.12.5",
-    "vite-plugin-node-polyfills": "^0.24.0",
-    "webtorrent": "^1.9.7"
+    "simple-peer": "^9.11.1"
   },
   "devDependencies": {
     "vite": "^5.0.0"
