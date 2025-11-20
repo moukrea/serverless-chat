@@ -45,10 +45,31 @@ class DHTDiscovery {
     }
 
     return new Promise((resolve, reject) => {
-      this.client.add(magnetURI, torrent => {
+      const onTorrentReady = torrent => {
         this.activeTorrent = torrent;
 
+        console.log('[DHT] Torrent ready:', {
+          infoHash: torrent.infoHash,
+          magnetURI: torrent.magnetURI,
+          numPeers: torrent.numPeers,
+        });
+
+        // Log tracker status
+        torrent.on('warning', err => {
+          console.warn('[DHT] Torrent warning:', err.message);
+        });
+
+        torrent.on('error', err => {
+          console.error('[DHT] Torrent error:', err.message);
+        });
+
+        // Log when we see peers in the tracker
+        torrent.discovery.on('peer', peer => {
+          console.log('[DHT] Discovered peer via tracker:', peer);
+        });
+
         torrent.on('wire', wire => {
+          console.log('[DHT] Wire connected!');
           wire.use(this.createExtension());
 
           if (this.onWireCallback) {
@@ -57,7 +78,14 @@ class DHTDiscovery {
         });
 
         resolve(torrent);
-      });
+      };
+
+      try {
+        this.client.add(magnetURI, onTorrentReady);
+      } catch (err) {
+        console.error('[DHT] Failed to add torrent:', err);
+        reject(err);
+      }
 
       // Timeout after 10 seconds
       setTimeout(() => {
