@@ -10,8 +10,41 @@
     <div class="container">
       <header>
         <i class="ti ti-message-circle"></i>
-        <h1>P2P Chat</h1>
+        <h1>P2P Mesh Chat</h1>
       </header>
+
+      <!-- Identity Panel -->
+      <div class="panel identity-panel">
+        <div class="panel-header">
+          <i class="ti ti-user"></i>
+          <h3>Your Identity</h3>
+        </div>
+        <div class="identity-info">
+          <div class="identity-row">
+            <label>Display Name:</label>
+            <span id="displayName" class="editable-name"></span>
+            <button id="btnEditName" class="btn-icon" title="Edit name">
+              <i class="ti ti-edit"></i>
+            </button>
+          </div>
+          <div class="identity-row">
+            <label>UUID:</label>
+            <span id="userUUID" class="uuid-text"></span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Peers Panel -->
+      <div class="panel peers-panel" id="peersPanel">
+        <div class="panel-header">
+          <i class="ti ti-users"></i>
+          <h3>Connected Peers</h3>
+          <span id="peerCount" class="peer-count">0</span>
+        </div>
+        <div id="peersList" class="peers-list">
+          <div class="no-peers">No peers connected yet</div>
+        </div>
+      </div>
 
       <div id="setup">
         <div class="panel">
@@ -95,20 +128,18 @@
         </div>
       </div>
 
-      <div id="chat" class="hidden">
-        <div class="panel chat-panel">
-          <div class="panel-header">
-            <i class="ti ti-messages"></i>
-            <h3>Chat</h3>
-            <div class="status-indicator connected"></div>
-          </div>
-          <div id="messages"></div>
-          <div class="input-row">
-            <input type="text" id="messageInput" placeholder="Type a message..." />
-            <button id="btnSend" class="btn-primary">
-              <i class="ti ti-send"></i>
-            </button>
-          </div>
+      <!-- Chat Panel (Always visible) -->
+      <div class="panel chat-panel">
+        <div class="panel-header">
+          <i class="ti ti-messages"></i>
+          <h3>Chat</h3>
+        </div>
+        <div id="messages"></div>
+        <div class="input-row">
+          <input type="text" id="messageInput" placeholder="Type a message..." />
+          <button id="btnSend" class="btn-primary">
+            <i class="ti ti-send"></i>
+          </button>
         </div>
       </div>
     </div>

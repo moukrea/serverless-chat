@@ -1,67 +1,140 @@
-/**
- * Simple P2P Chat App
- */
-import './styles/main.css';
-import p2p from './p2p.js';
 import process from 'process';
-
-// Polyfill for SimplePeer dependencies
 window.process = process;
 globalThis.process = process;
 
+import Identity from './identity.js';
+import MeshNetwork from './mesh.js';
+import './styles/main.css';
+
+// Initialize identity and mesh network
+const identity = new Identity();
+const mesh = new MeshNetwork(identity);
+
+// Helper function
 const $ = (id) => document.getElementById(id);
 
-// App State
-let isInitiator = false;
+// Display identity
+$('displayName').textContent = identity.displayName;
+$('userUUID').textContent = identity.uuid;
 
-// Setup P2P callbacks
-p2p.onConnect(() => {
-  showChat();
-  addMessage('✅ Connected!', 'system');
-});
+// Setup mesh event handlers
+mesh.onPeerConnect = (uuid, displayName) => {
+  addMessage(`${displayName} joined the mesh`, 'system');
+  updatePeersList();
+  enableChat();
+};
 
-p2p.onMessage((message) => {
-  addMessage(message, 'peer');
-});
+mesh.onPeerDisconnect = (uuid) => {
+  const displayName = identity.getPeerDisplayName(uuid, 'Peer');
+  addMessage(`${displayName} left the mesh`, 'system');
+  updatePeersList();
+};
 
-p2p.onDisconnect(() => {
-  addMessage('❌ Disconnected', 'system');
-});
+mesh.onPeerUpdate = (uuid, displayName) => {
+  addMessage(`Peer renamed to ${displayName}`, 'system');
+  updatePeersList();
+};
 
-// UI Functions
-function showSetup() {
-  $('setup').classList.remove('hidden');
-  $('chat').classList.add('hidden');
-  $('initiatorFlow').classList.add('hidden');
-  $('joinerFlow').classList.add('hidden');
-}
+mesh.onMessage = (uuid, displayName, text) => {
+  const peerName = identity.getPeerDisplayName(uuid, displayName);
+  addMessage(`${peerName}: ${text}`, 'peer', uuid);
+};
 
-function showChat() {
-  $('setup').classList.add('hidden');
-  $('chat').classList.remove('hidden');
-}
+// Update peers list UI
+function updatePeersList() {
+  const peers = mesh.getConnectedPeers();
+  const peersList = $('peersList');
+  const peerCount = $('peerCount');
 
-function addMessage(text, type) {
-  const div = document.createElement('div');
-  div.className = `message ${type}`;
+  peerCount.textContent = peers.length;
 
-  if (type === 'sent') {
-    div.textContent = `You: ${text}`;
-  } else if (type === 'peer') {
-    div.textContent = `Peer: ${text}`;
-  } else {
-    div.textContent = text;
+  if (peers.length === 0) {
+    peersList.innerHTML = '<div class="no-peers">No peers connected yet</div>';
+    return;
   }
 
+  peersList.innerHTML = peers
+    .map(
+      (peer) => `
+    <div class="peer-item" data-uuid="${peer.uuid}">
+      <div class="peer-status"></div>
+      <div class="peer-info">
+        <div class="peer-name" data-uuid="${peer.uuid}">
+          <span>${peer.displayName}</span>
+          <i class="ti ti-edit"></i>
+        </div>
+        <div class="peer-uuid">${peer.uuid.substring(0, 16)}...</div>
+      </div>
+    </div>
+  `
+    )
+    .join('');
+
+  // Add click handlers for renaming
+  peersList.querySelectorAll('.peer-name').forEach((el) => {
+    el.addEventListener('click', () => {
+      const uuid = el.dataset.uuid;
+      const peer = peers.find((p) => p.uuid === uuid);
+      if (peer) {
+        renamePeer(uuid, peer.displayName, peer.originalDisplayName);
+      }
+    });
+  });
+}
+
+// Rename peer locally
+function renamePeer(uuid, currentName, originalName) {
+  const newName = prompt(
+    `Rename peer locally:\n\nOriginal name: ${originalName}\nCurrent custom name: ${currentName === originalName ? '(none)' : currentName}`,
+    currentName
+  );
+
+  if (newName !== null && newName.trim()) {
+    if (newName === originalName) {
+      // Reset to original name
+      identity.setPeerRename(uuid, '');
+    } else {
+      identity.setPeerRename(uuid, newName);
+    }
+    updatePeersList();
+  }
+}
+
+// Edit own display name
+$('btnEditName').onclick = () => {
+  const newName = prompt('Enter your new display name:', identity.displayName);
+  if (newName && newName.trim()) {
+    identity.setDisplayName(newName.trim());
+    $('displayName').textContent = identity.displayName;
+    mesh.broadcastNameChange();
+    addMessage(`You changed your name to ${identity.displayName}`, 'system');
+  }
+};
+
+// Also allow clicking on the name itself
+$('displayName').onclick = () => $('btnEditName').click();
+
+// Add message to chat
+function addMessage(text, type = 'sent', uuid = null) {
+  const div = document.createElement('div');
+  div.className = `message ${type}`;
+  div.textContent = text;
+  if (uuid) {
+    div.dataset.uuid = uuid;
+  }
   $('messages').appendChild(div);
   $('messages').scrollTop = $('messages').scrollHeight;
 }
 
+// Enable chat when at least one peer connected
+function enableChat() {
+  $('messageInput').disabled = false;
+  $('btnSend').disabled = false;
+}
+
 // Event Handlers
 $('btnInvite').onclick = async () => {
-  isInitiator = true;
   $('btnInvite').disabled = true;
-  $('btnJoin').disabled = true;
   $('initiatorFlow').classList.remove('hidden');
 
   // Show loader
@@ -69,7 +142,7 @@ $('btnInvite').onclick = async () => {
   $('offerOutput').classList.add('hidden');
   $('btnCopyOffer').classList.add('hidden');
 
-  const offer = await p2p.createOffer();
+  const offer = await mesh.createOffer();
 
   // Hide loader, show code
   $('offerLoader').classList.add('hidden');
@@ -77,14 +150,22 @@ $('btnInvite').onclick = async () => {
   $('offerOutput').classList.remove('hidden');
   $('btnCopyOffer').classList.remove('hidden');
 
-  addMessage('Offer generated. Share it with your peer.', 'system');
+  addMessage('Invitation generated. Waiting for peer to respond...', 'system');
+
+  // Allow creating more invitations
+  setTimeout(() => {
+    $('btnInvite').disabled = false;
+  }, 1000);
 };
 
 $('btnJoin').onclick = () => {
-  isInitiator = false;
-  $('btnInvite').disabled = true;
   $('btnJoin').disabled = true;
   $('joinerFlow').classList.remove('hidden');
+
+  // Allow joining more
+  setTimeout(() => {
+    $('btnJoin').disabled = false;
+  }, 1000);
 };
 
 $('btnCopyOffer').onclick = async () => {
@@ -114,7 +195,7 @@ $('btnProcessOffer').onclick = async () => {
     $('answerOutput').classList.add('hidden');
     $('btnCopyAnswer').classList.add('hidden');
 
-    const answer = await p2p.acceptOffer(offer);
+    const answer = await mesh.acceptOffer(offer);
 
     // Hide loader, show code
     $('answerLoader').classList.add('hidden');
@@ -122,7 +203,13 @@ $('btnProcessOffer').onclick = async () => {
     $('answerOutput').classList.remove('hidden');
     $('btnCopyAnswer').classList.remove('hidden');
 
-    addMessage('Answer generated. Share it with your peer.', 'system');
+    addMessage('Response generated. Share it with the inviter...', 'system');
+
+    // Clear and allow more
+    setTimeout(() => {
+      $('offerInput').value = '';
+      $('joinerAnswerStep').classList.add('hidden');
+    }, 30000); // Clear after 30 seconds
   } catch (e) {
     alert('Invalid offer format');
   }
@@ -144,23 +231,32 @@ $('btnCopyAnswer').onclick = async () => {
 $('btnAcceptAnswer').onclick = () => {
   const answer = $('answerInput').value.trim();
   if (!answer) {
-    alert('Please paste an answer');
+    alert('Please paste a response');
     return;
   }
 
   try {
-    p2p.acceptAnswer(answer);
-    addMessage('Connecting...', 'system');
+    mesh.acceptAnswer(answer);
+    addMessage('Processing response... connecting to peer...', 'system');
+
+    // Clear the input
+    $('answerInput').value = '';
+
+    // Hide the flow after connection attempt
+    setTimeout(() => {
+      $('initiatorFlow').classList.add('hidden');
+    }, 2000);
   } catch (e) {
-    alert('Invalid answer format');
+    alert('Invalid response format: ' + e.message);
   }
 };
 
+// Send message
 $('btnSend').onclick = () => {
   const text = $('messageInput').value.trim();
-  if (text && p2p.connected) {
-    p2p.send(text);
-    addMessage(text, 'sent');
+  if (text && mesh.getConnectedPeers().length > 0) {
+    mesh.sendMessage(text);
+    addMessage(`You: ${text}`, 'sent');
     $('messageInput').value = '';
   }
 };
@@ -171,5 +267,10 @@ $('messageInput').onkeypress = (e) => {
   }
 };
 
-// Initialize
-console.log('Simple P2P Chat initialized');
+// Disable send button initially
+$('messageInput').disabled = true;
+$('btnSend').disabled = true;
+
+// Welcome message
+addMessage('Welcome! Your identity has been created.', 'system');
+addMessage('Create an invitation or join with a code to connect to peers.', 'system');

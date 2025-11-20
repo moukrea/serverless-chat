@@ -79,6 +79,151 @@ h3 {
   background: rgba(255, 255, 255, 0.08);
 }
 
+.identity-panel {
+  background: rgba(99, 102, 241, 0.1);
+  border-color: rgba(99, 102, 241, 0.3);
+}
+
+.identity-info {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.identity-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.identity-row label {
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.7);
+  min-width: 110px;
+}
+
+.editable-name {
+  flex: 1;
+  color: #e8eaed;
+  font-weight: 500;
+  cursor: pointer;
+  padding: 6px 10px;
+  border-radius: 4px;
+  transition: background 0.2s ease;
+}
+
+.editable-name:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.uuid-text {
+  font-family: 'Monaco', 'Menlo', monospace;
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.5);
+  user-select: all;
+}
+
+.btn-icon {
+  padding: 6px;
+  min-width: auto;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 6px;
+}
+
+.btn-icon:hover {
+  background: rgba(99, 102, 241, 0.3);
+  transform: none;
+}
+
+.peers-panel {
+  background: rgba(16, 185, 129, 0.1);
+  border-color: rgba(16, 185, 129, 0.3);
+}
+
+.peer-count {
+  margin-left: auto;
+  background: rgba(16, 185, 129, 0.3);
+  color: #10b981;
+  padding: 4px 12px;
+  border-radius: 12px;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.peers-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.no-peers {
+  text-align: center;
+  color: rgba(255, 255, 255, 0.4);
+  font-style: italic;
+  padding: 20px;
+}
+
+.peer-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  transition: all 0.2s ease;
+}
+
+.peer-item:hover {
+  background: rgba(0, 0, 0, 0.3);
+  border-color: rgba(16, 185, 129, 0.3);
+}
+
+.peer-status {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #10b981;
+  box-shadow: 0 0 8px rgba(16, 185, 129, 0.6);
+}
+
+.peer-info {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.peer-name {
+  font-weight: 500;
+  color: #e8eaed;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.peer-name:hover {
+  color: #10b981;
+}
+
+.peer-name i {
+  font-size: 14px;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+
+.peer-name:hover i {
+  opacity: 1;
+}
+
+.peer-uuid {
+  font-size: 11px;
+  font-family: 'Monaco', 'Menlo', monospace;
+  color: rgba(255, 255, 255, 0.4);
+}
+
 .button-group {
   display: flex;
   gap: 12px;
