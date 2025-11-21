@@ -635,6 +635,225 @@ $('btnCloseSidebar').addEventListener('click', () => {
 });
 
 // ============================================
+// Connection Diagnostics Panel
+// ============================================
+
+function showDiagnostics() {
+  // Dynamically import diagnostics module
+  import('./diagnostics/connection-diagnostics.js').then((module) => {
+    const diagnostics = module.default;
+    const globalStats = diagnostics.getGlobalStats();
+    const summary = diagnostics.getSummary();
+
+    // Build connection type rows
+    let connectionTypeRows = '';
+    if (globalStats.connectionsByType && globalStats.connectionsByType.length > 0) {
+      const maxCount = Math.max(...globalStats.connectionsByType.map((c) => c.count));
+      connectionTypeRows = globalStats.connectionsByType
+        .map(
+          ({ type, count }) => `
+          <div class="connection-type-row">
+            <span class="type-name">${type}</span>
+            <span class="type-count">${count}</span>
+            <div class="type-bar" style="width: ${(count / maxCount) * 100}%"></div>
+          </div>
+        `
+        )
+        .join('');
+    } else {
+      connectionTypeRows = '<div class="no-data">No connection data yet</div>';
+    }
+
+    // Build current connections list
+    let currentConnectionsHTML = '';
+    const connectedPeers = Array.from(mesh.peers.entries()).filter(
+      ([id, data]) => data.status === 'connected' && id !== '_temp'
+    );
+
+    if (connectedPeers.length > 0) {
+      currentConnectionsHTML = connectedPeers
+        .map(([id, data]) => {
+          const diag = diagnostics.getDiagnostics(id);
+          return `
+            <div class="connection-detail">
+              <div class="connection-name">${data.displayName}</div>
+              <div class="connection-info">
+                <span><i class="ti ti-plug"></i> ${diag?.connectionType?.name || 'Unknown'}</span>
+                <span><i class="ti ti-network"></i> ${diag?.protocol || 'Unknown'}</span>
+                ${
+                  diag?.timing.connectionTime
+                    ? `<span><i class="ti ti-clock"></i> ${diag.timing.connectionTime}ms</span>`
+                    : ''
+                }
+                ${
+                  diag?.rtt
+                    ? `<span><i class="ti ti-activity"></i> RTT: ${(diag.rtt * 1000).toFixed(1)}ms</span>`
+                    : ''
+                }
+              </div>
+            </div>
+          `;
+        })
+        .join('');
+    } else {
+      currentConnectionsHTML = '<div class="no-data">No active connections</div>';
+    }
+
+    // Create modal HTML
+    const diagHTML = `
+      <div class="diagnostics-modal" id="diagnosticsModal">
+        <div class="diagnostics-overlay"></div>
+        <div class="diagnostics-content">
+          <div class="diagnostics-header">
+            <h2><i class="ti ti-activity"></i> Connection Diagnostics</h2>
+            <button class="btn-close-diagnostics" id="btnCloseDiagnostics">
+              <i class="ti ti-x"></i>
+            </button>
+          </div>
+
+          <div class="diagnostics-body">
+            <!-- Global Statistics -->
+            <div class="diag-section">
+              <h3>Global Statistics</h3>
+              <div class="diag-grid">
+                <div class="diag-stat">
+                  <span class="diag-label">Total Attempts:</span>
+                  <span class="diag-value">${globalStats.totalAttempts}</span>
+                </div>
+                <div class="diag-stat">
+                  <span class="diag-label">Successful:</span>
+                  <span class="diag-value success">${globalStats.successfulConnections}</span>
+                </div>
+                <div class="diag-stat">
+                  <span class="diag-label">Failed:</span>
+                  <span class="diag-value error">${globalStats.failedConnections}</span>
+                </div>
+                <div class="diag-stat">
+                  <span class="diag-label">Success Rate:</span>
+                  <span class="diag-value">${globalStats.successRate}%</span>
+                </div>
+                <div class="diag-stat">
+                  <span class="diag-label">Avg Connection Time:</span>
+                  <span class="diag-value">${Math.round(globalStats.avgConnectionTime)}ms</span>
+                </div>
+                <div class="diag-stat">
+                  <span class="diag-label">Avg ICE Gathering:</span>
+                  <span class="diag-value">${Math.round(globalStats.avgGatheringTime)}ms</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Connection Types -->
+            <div class="diag-section">
+              <h3>Connections by Type</h3>
+              <div class="connection-types">
+                ${connectionTypeRows}
+              </div>
+            </div>
+
+            <!-- Current Connections -->
+            <div class="diag-section">
+              <h3>Current Connections (${connectedPeers.length})</h3>
+              <div class="current-connections">
+                ${currentConnectionsHTML}
+              </div>
+            </div>
+
+            <!-- ICE Candidate Statistics -->
+            <div class="diag-section">
+              <h3>ICE Candidate Statistics</h3>
+              <div class="diag-grid">
+                <div class="diag-stat">
+                  <span class="diag-label">Avg Host Candidates:</span>
+                  <span class="diag-value">${summary.candidateStats.avgHostCandidates}</span>
+                </div>
+                <div class="diag-stat">
+                  <span class="diag-label">Avg STUN Candidates:</span>
+                  <span class="diag-value">${summary.candidateStats.avgSrflxCandidates}</span>
+                </div>
+                <div class="diag-stat">
+                  <span class="diag-label">Avg TURN Candidates:</span>
+                  <span class="diag-value">${summary.candidateStats.avgRelayCandidates}</span>
+                </div>
+                <div class="diag-stat">
+                  <span class="diag-label">Total Avg Candidates:</span>
+                  <span class="diag-value">${summary.candidateStats.totalCandidates}</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Export Button -->
+            <div class="diag-section">
+              <button class="btn-export-diagnostics" id="btnExportDiagnostics">
+                <i class="ti ti-download"></i>
+                <span>Export Diagnostics JSON</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    `;
+
+    // Add to DOM
+    const existingModal = document.getElementById('diagnosticsModal');
+    if (existingModal) {
+      existingModal.remove();
+    }
+
+    document.body.insertAdjacentHTML('beforeend', diagHTML);
+
+    // Set up event listeners
+    $('btnCloseDiagnostics').onclick = closeDiagnostics;
+    $('diagnosticsModal').querySelector('.diagnostics-overlay').onclick = closeDiagnostics;
+    $('btnExportDiagnostics').onclick = exportDiagnostics;
+
+    // Close on ESC key
+    const escapeHandler = (e) => {
+      if (e.key === 'Escape') {
+        closeDiagnostics();
+        document.removeEventListener('keydown', escapeHandler);
+      }
+    };
+    document.addEventListener('keydown', escapeHandler);
+  });
+}
+
+function closeDiagnostics() {
+  const modal = document.getElementById('diagnosticsModal');
+  if (modal) {
+    modal.remove();
+  }
+}
+
+function exportDiagnostics() {
+  import('./diagnostics/connection-diagnostics.js').then((module) => {
+    const diagnostics = module.default;
+    const data = diagnostics.exportDiagnostics();
+
+    const blob = new Blob([data], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `connection-diagnostics-${Date.now()}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+
+    // Show feedback
+    const exportBtn = $('btnExportDiagnostics');
+    const originalHTML = exportBtn.innerHTML;
+    exportBtn.innerHTML = '<i class="ti ti-check"></i><span>Exported!</span>';
+    setTimeout(() => {
+      exportBtn.innerHTML = originalHTML;
+    }, 2000);
+  });
+}
+
+// Diagnostics button click handler
+$('btnDiagnostics').onclick = () => {
+  showDiagnostics();
+};
+
+// ============================================
 // PWA Install Manager
 // ============================================
 
