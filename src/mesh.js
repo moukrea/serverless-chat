@@ -4,6 +4,8 @@ import PeerIntroductionManager from './mesh-introduction.js';
 import LatencyManager from './mesh-latency.js';
 import ConnectionManager from './mesh-connection.js';
 import SecurityManager from './mesh-security.js';
+import ICE_CONFIG from './config/ice-config.js';
+import connectionDiagnostics from './diagnostics/connection-diagnostics.js';
 
 // Multi-peer mesh network manager with automatic discovery and routing
 class MeshNetwork {
@@ -49,18 +51,7 @@ class MeshNetwork {
       const peer = new SimplePeer({
         initiator: true,
         trickle: false,
-        config: {
-          iceServers: [
-            { urls: 'stun:stun.l.google.com:19302' },
-            { urls: 'stun:stun1.l.google.com:19302' },
-            {
-              urls: 'turn:openrelay.metered.ca:80',
-              username: 'openrelayproject',
-              credential: 'openrelayproject',
-            },
-          ],
-          iceTransportPolicy: 'all',
-        },
+        config: ICE_CONFIG, // Use centralized ICE configuration
       });
 
       peer.on('signal', (data) => {
@@ -72,6 +63,11 @@ class MeshNetwork {
         const encoded = btoa(JSON.stringify(offerData));
         resolve(encoded);
       });
+
+      // Start diagnostics monitoring
+      const tempId = `temp-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+      connectionDiagnostics.startMonitoring(tempId, peer);
+      peer._diagnosticsId = tempId;
 
       // Store peer temporarily until we get their identity
       peer._tempPeer = true;
@@ -96,18 +92,7 @@ class MeshNetwork {
         const peer = new SimplePeer({
           initiator: false,
           trickle: false,
-          config: {
-            iceServers: [
-              { urls: 'stun:stun.l.google.com:19302' },
-              { urls: 'stun:stun1.l.google.com:19302' },
-              {
-                urls: 'turn:openrelay.metered.ca:80',
-                username: 'openrelayproject',
-                credential: 'openrelayproject',
-              },
-            ],
-            iceTransportPolicy: 'all',
-          },
+          config: ICE_CONFIG, // Use centralized ICE configuration
         });
 
         peer.on('signal', (answerSignal) => {
@@ -119,6 +104,9 @@ class MeshNetwork {
           const encoded = btoa(JSON.stringify(answerData));
           resolve(encoded);
         });
+
+        // Start diagnostics monitoring
+        connectionDiagnostics.startMonitoring(uuid, peer);
 
         // Register this peer
         this.peers.set(uuid, {
@@ -203,18 +191,7 @@ class MeshNetwork {
     const peer = new SimplePeer({
       initiator: true,
       trickle: false,
-      config: {
-        iceServers: [
-          { urls: 'stun:stun.l.google.com:19302' },
-          { urls: 'stun:stun1.l.google.com:19302' },
-          {
-            urls: 'turn:openrelay.metered.ca:80',
-            username: 'openrelayproject',
-            credential: 'openrelayproject',
-          },
-        ],
-        iceTransportPolicy: 'all',
-      },
+      config: ICE_CONFIG, // Use centralized ICE configuration
     });
 
     // Wait for signal
@@ -230,6 +207,9 @@ class MeshNetwork {
 
       this.router.routeMessage(relayMessage);
     });
+
+    // Start diagnostics monitoring
+    connectionDiagnostics.startMonitoring(peerId, peer);
 
     // Register peer
     this.peers.set(peerId, {
@@ -255,18 +235,7 @@ class MeshNetwork {
       const peer = new SimplePeer({
         initiator: false,
         trickle: false,
-        config: {
-          iceServers: [
-            { urls: 'stun:stun.l.google.com:19302' },
-            { urls: 'stun:stun1.l.google.com:19302' },
-            {
-              urls: 'turn:openrelay.metered.ca:80',
-              username: 'openrelayproject',
-              credential: 'openrelayproject',
-            },
-          ],
-          iceTransportPolicy: 'all',
-        },
+        config: ICE_CONFIG, // Use centralized ICE configuration
       });
 
       peer.on('signal', (answerSignal) => {
@@ -281,6 +250,9 @@ class MeshNetwork {
 
         this.router.routeMessage(relayMessage);
       });
+
+      // Start diagnostics monitoring
+      connectionDiagnostics.startMonitoring(fromPeerId, peer);
 
       // Register peer
       this.peers.set(fromPeerId, {
@@ -313,9 +285,29 @@ class MeshNetwork {
         const peerData = this.peers.get(uuid);
         peerData.status = 'connected';
         peerData.connectedAt = Date.now();
-        this.peers.set(uuid, peerData);
 
-        console.log(`[Mesh] Connected to ${peerData.displayName} (${uuid.substring(0, 8)})`);
+        // Transfer diagnostics data from temp ID to actual UUID
+        if (peer._diagnosticsId && peer._diagnosticsId !== uuid) {
+          const tempDiag = connectionDiagnostics.getDiagnostics(peer._diagnosticsId);
+          if (tempDiag) {
+            connectionDiagnostics.connections.set(uuid, tempDiag);
+            connectionDiagnostics.connections.delete(peer._diagnosticsId);
+            tempDiag.peerId = uuid;
+          }
+        }
+
+        // Update connection type from diagnostics
+        const diag = connectionDiagnostics.getDiagnostics(uuid);
+        if (diag && diag.connectionType) {
+          peerData.connectionType = diag.connectionType.name;
+          console.log(
+            `[Mesh] ${peerData.displayName} (${uuid.substring(0, 8)}) connected via ${diag.connectionType.name} (${diag.protocol})`
+          );
+        } else {
+          console.log(`[Mesh] Connected to ${peerData.displayName} (${uuid.substring(0, 8)})`);
+        }
+
+        this.peers.set(uuid, peerData);
 
         if (this.onPeerConnect) {
           this.onPeerConnect(uuid, peerData.displayName);

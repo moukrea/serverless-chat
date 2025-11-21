@@ -2,19 +2,10 @@
  * Peer connection management
  */
 import SimplePeer from 'simple-peer';
+import ICE_CONFIG, { detectConnectionTypeFromStats } from '../config/ice-config.js';
 
-export const ICE_CONFIG = {
-  iceServers: [
-    { urls: 'stun:stun.l.google.com:19302' },
-    { urls: 'stun:stun1.l.google.com:19302' },
-    { urls: 'turn:openrelay.metered.ca:80', username: 'openrelayproject', credential: 'openrelayproject' },
-    { urls: 'turn:openrelay.metered.ca:443', username: 'openrelayproject', credential: 'openrelayproject' },
-    { urls: 'turn:openrelay.metered.ca:443?transport=tcp', username: 'openrelayproject', credential: 'openrelayproject' },
-    { urls: 'turns:openrelay.metered.ca:443?transport=tcp', username: 'openrelayproject', credential: 'openrelayproject' },
-  ],
-  iceTransportPolicy: 'all',
-  iceCandidatePoolSize: 10,
-};
+// Re-export ICE_CONFIG for backwards compatibility
+export { ICE_CONFIG };
 
 class PeerManager {
   constructor() {
@@ -94,18 +85,22 @@ class PeerManager {
         const peerData = this.peers.get(peerId);
         if (!peerData) return;
 
-        stats.forEach(report => {
-          if (report.type === 'candidate-pair' && report.state === 'succeeded') {
-            stats.forEach(candidate => {
-              if (candidate.id === report.localCandidateId) {
-                peerData.connectionType =
-                  candidate.candidateType === 'relay'
-                    ? 'relay'
-                    : `${candidate.candidateType}-${candidate.protocol || 'unknown'}`;
-              }
-            });
-          }
-        });
+        // Use centralized connection type detection
+        const { connectionType, localCandidate, remoteCandidate } =
+          detectConnectionTypeFromStats(stats);
+
+        if (connectionType) {
+          peerData.connectionType = connectionType.name;
+          peerData.connectionDetails = {
+            type: connectionType,
+            localCandidate,
+            remoteCandidate
+          };
+
+          console.log(
+            `[PeerManager] ${peerId.substring(0, 8)} connected via ${connectionType.name}`
+          );
+        }
       } catch (e) {
         console.error('Failed to detect connection type:', e);
       }
