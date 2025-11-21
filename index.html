@@ -3,8 +3,17 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="Serverless peer-to-peer chat with mesh networking. No server required.">
+    <meta name="theme-color" content="#5865F2">
+
+    <!-- iOS meta tags -->
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="P2P Chat">
+
     <title>P2P Mesh Chat</title>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css">
+    <link rel="icon" type="image/svg+xml" href="/serverless-chat/icon.svg">
   </head>
   <body>
     <div class="container">
@@ -45,6 +54,13 @@
 
         <!-- Connection Controls -->
         <div class="connection-controls">
+          <button class="btn-install-app hidden" id="btnInstallApp"
+                  aria-label="Install P2P Mesh Chat as an app"
+                  title="Install app for offline access">
+            <i class="ti ti-download"></i>
+            <span>Install App</span>
+          </button>
+
           <button class="btn-new-connection" id="btnNewConnection">
             <i class="ti ti-plus"></i>
             <span>New Connection</span>

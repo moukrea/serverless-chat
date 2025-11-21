@@ -576,6 +576,89 @@ body {
   font-size: 18px;
 }
 
+/* PWA Install Button */
+.btn-install-app {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--spacing-sm);
+  padding: var(--spacing-md);
+  background-color: var(--accent-primary);
+  color: var(--text-on-accent);
+  border: none;
+  border-radius: var(--radius-md);
+  font-weight: 600;
+  font-size: 14px;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  margin-bottom: var(--spacing-md);
+}
+
+.btn-install-app:hover:not(:disabled) {
+  background-color: #4752c4;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 8px var(--shadow-hover);
+}
+
+.btn-install-app:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+.btn-install-app i {
+  font-size: 18px;
+}
+
+/* Install Button States */
+.btn-install-app.installing {
+  background-color: var(--bg-tertiary);
+  color: var(--text-muted);
+  cursor: wait;
+  pointer-events: none;
+}
+
+.btn-install-app.installing i {
+  animation: spin 1s linear infinite;
+}
+
+.btn-install-app.success {
+  background-color: var(--accent-success);
+  cursor: default;
+  pointer-events: none;
+}
+
+.btn-install-app.error {
+  background-color: var(--accent-danger);
+  cursor: pointer;
+  animation: shake 0.4s ease-in-out;
+}
+
+.btn-install-app.pulse {
+  animation: pulse 2s ease-in-out infinite;
+}
+
+/* Install Button Animations */
+@keyframes pulse {
+  0%, 100% {
+    box-shadow: 0 0 0 0 rgba(88, 101, 242, 0.4);
+  }
+  50% {
+    box-shadow: 0 0 0 8px rgba(88, 101, 242, 0);
+  }
+}
+
+@keyframes shake {
+  0%, 100% {
+    transform: translateX(0);
+  }
+  25% {
+    transform: translateX(-4px);
+  }
+  75% {
+    transform: translateX(4px);
+  }
+}
+
 /* ============================================
    Main Content Area (Right Panel)
    ============================================ */

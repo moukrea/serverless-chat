@@ -13,6 +13,9 @@
     "simple-peer": "^9.11.1"
   },
   "devDependencies": {
-    "vite": "^5.0.0"
+    "sharp": "^0.34.5",
+    "vite": "^5.0.0",
+    "vite-plugin-pwa": "^1.1.0",
+    "workbox-window": "^7.4.0"
   }
 }

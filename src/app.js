@@ -635,11 +635,179 @@ $('btnCloseSidebar').addEventListener('click', () => {
 });
 
 // ============================================
+// PWA Install Manager
+// ============================================
+
+class PWAInstallManager {
+  constructor() {
+    this.deferredPrompt = null;
+    this.installButton = $('btnInstallApp');
+    this.isInstalled = this.checkIfInstalled();
+
+    this.init();
+  }
+
+  checkIfInstalled() {
+    // Check if running in standalone mode (installed as PWA)
+    const isStandalone = window.matchMedia('(display-mode: standalone)').matches;
+    const isIOSStandalone = window.navigator.standalone === true;
+
+    return isStandalone || isIOSStandalone;
+  }
+
+  init() {
+    // If already installed, keep button hidden
+    if (this.isInstalled) {
+      console.log('PWA is already installed');
+      return;
+    }
+
+    // Listen for the beforeinstallprompt event
+    window.addEventListener('beforeinstallprompt', (e) => {
+      console.log('beforeinstallprompt event fired');
+
+      // Prevent the default browser install prompt
+      e.preventDefault();
+
+      // Store the event for later use
+      this.deferredPrompt = e;
+
+      // Show the install button with pulse animation
+      this.showInstallButton();
+    });
+
+    // Listen for successful installation
+    window.addEventListener('appinstalled', () => {
+      console.log('PWA installed successfully');
+      this.handleInstallSuccess();
+    });
+
+    // Handle install button click
+    this.installButton.addEventListener('click', () => {
+      this.handleInstallClick();
+    });
+
+    // Check if already installable (rare case where event fired before class init)
+    if (this.deferredPrompt) {
+      this.showInstallButton();
+    }
+  }
+
+  showInstallButton() {
+    this.installButton.classList.remove('hidden');
+    this.installButton.classList.add('pulse');
+
+    // Remove pulse after a few cycles (6 seconds = 3 complete pulses)
+    setTimeout(() => {
+      this.installButton.classList.remove('pulse');
+    }, 6000);
+  }
+
+  hideInstallButton() {
+    this.installButton.classList.add('hidden');
+    this.installButton.classList.remove('pulse', 'installing', 'success', 'error');
+  }
+
+  async handleInstallClick() {
+    if (!this.deferredPrompt) {
+      console.error('No deferred prompt available');
+      this.showError('Installation not available');
+      return;
+    }
+
+    try {
+      // Show installing state
+      this.installButton.classList.remove('pulse');
+      this.installButton.classList.add('installing');
+      this.updateButtonContent('ti ti-loader', 'Installing...');
+
+      // Show the install prompt
+      this.deferredPrompt.prompt();
+
+      // Wait for user response
+      const { outcome } = await this.deferredPrompt.userChoice;
+
+      console.log(`User response to install prompt: ${outcome}`);
+
+      if (outcome === 'accepted') {
+        // Show success state temporarily
+        this.installButton.classList.remove('installing');
+        this.installButton.classList.add('success');
+        this.updateButtonContent('ti ti-check', 'Installed!');
+
+        // Hide button after 2 seconds
+        setTimeout(() => {
+          this.hideInstallButton();
+        }, 2000);
+      } else {
+        // User dismissed the prompt
+        this.installButton.classList.remove('installing');
+        this.updateButtonContent('ti ti-download', 'Install App');
+
+        // Add pulse back to encourage retry
+        setTimeout(() => {
+          this.installButton.classList.add('pulse');
+        }, 500);
+      }
+
+      // Clear the deferred prompt
+      this.deferredPrompt = null;
+
+    } catch (error) {
+      console.error('Error during installation:', error);
+      this.showError('Installation failed');
+    }
+  }
+
+  showError(message) {
+    this.installButton.classList.remove('installing', 'success');
+    this.installButton.classList.add('error');
+    this.updateButtonContent('ti ti-alert-circle', message);
+
+    // Reset after 2 seconds
+    setTimeout(() => {
+      this.installButton.classList.remove('error');
+      this.updateButtonContent('ti ti-download', 'Install App');
+
+      // If prompt is still available, add pulse back
+      if (this.deferredPrompt) {
+        this.installButton.classList.add('pulse');
+      }
+    }, 2000);
+  }
+
+  handleInstallSuccess() {
+    // Show success state
+    this.installButton.classList.remove('installing', 'pulse');
+    this.installButton.classList.add('success');
+    this.updateButtonContent('ti ti-check', 'Installed!');
+
+    addMessage('App installed successfully! You can now use it offline.', 'system');
+
+    // Hide button after 2 seconds
+    setTimeout(() => {
+      this.hideInstallButton();
+    }, 2000);
+  }
+
+  updateButtonContent(iconClass, text) {
+    const icon = this.installButton.querySelector('i');
+    const span = this.installButton.querySelector('span');
+
+    if (icon) icon.className = iconClass;
+    if (span) span.textContent = text;
+  }
+}
+
+// ============================================
 // Initialization
 // ============================================
 
 // Initialize theme
 initTheme();
+
+// Initialize PWA Install Manager
+const pwaInstallManager = new PWAInstallManager();
 
 // Disable send button initially
 $('messageInput').disabled = true;
