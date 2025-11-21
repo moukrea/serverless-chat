@@ -1,5 +1,23 @@
 // Message Router with Flood Routing and Deduplication
 
+/**
+ * Supported Message Types
+ *
+ * Core messaging:
+ * - 'chat' - Chat messages (broadcast)
+ * - 'peer_introduction' - Peer introduction for mesh expansion
+ * - 'relay_signal' - WebRTC signaling through relay
+ *
+ * Reconnection (relay-reconnection.js):
+ * - 'reconnect_offer' - WebRTC offer for reconnection
+ * - 'reconnect_answer' - WebRTC answer for reconnection
+ * - 'reconnect_rejection' - Target rejected reconnection
+ * - 'path_query' - Query mesh for path to peer
+ * - 'path_response' - Response indicating path exists
+ *
+ * Message types are extensible - register handlers via on(msgType, handler)
+ */
+
 class MessageRouter {
   constructor(identity, config = {}) {
     this.identity = identity;

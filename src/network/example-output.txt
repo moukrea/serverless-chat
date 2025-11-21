@@ -1,0 +1,165 @@
+# Network Change Detector - Example Console Output
+
+## Initialization
+
+[NetworkDetector] Initialized with features: { networkInfo: true, webRTC: true, onLine: true }
+[NetworkDetector] Starting network change monitoring...
+[NetworkDetector] Initial connection type: wifi
+[NetworkDetector] Listening for connection changes
+[NetworkDetector] Listening for online/offline events
+[NetworkDetector] Checking public IP...
+[NetworkDetector] Current IP: 203.0.113.42
+[NetworkDetector] Initial IP recorded: 203.0.113.42
+
+## Normal Operation (Periodic Checks)
+
+[NetworkDetector] Checking public IP...
+[NetworkDetector] Current IP: 203.0.113.42
+[NetworkDetector] IP unchanged: 203.0.113.42
+
+## WiFi → Cellular Switch
+
+[NetworkDetector] Network connection changed
+[NetworkDetector] Connection type changed: wifi → cellular
+[NetworkDetector] Connection details: {
+  effectiveType: '4g',
+  downlink: '8.5 Mbps',
+  rtt: '75 ms',
+  saveData: false
+}
+[NetworkDetector] Checking public IP...
+[NetworkDetector] Current IP: 203.0.113.99
+[NetworkDetector] 🔄 IP CHANGED: 203.0.113.42 → 203.0.113.99
+[NetworkDetector] Triggering IP change announcement...
+[ReconnectorAdapter] IP change detected, announcing to mesh...
+[AnnouncementManager] Announcing IP change
+[AnnouncementManager] IP change announced
+[ReconnectorAdapter] ✅ IP change announced successfully
+
+## Going Offline
+
+[NetworkDetector] 🔴 Went offline
+[NetworkDetector] Was online for 1847.3s (1847300ms)
+
+## Coming Back Online
+
+[NetworkDetector] 🟢 Back online
+[NetworkDetector] Was offline for 45.2s (45200ms)
+[NetworkDetector] Connection type: wifi
+[NetworkDetector] Checking public IP...
+[NetworkDetector] Current IP: 203.0.113.42
+[NetworkDetector] 🔄 IP CHANGED: 203.0.113.99 → 203.0.113.42
+[NetworkDetector] Triggering IP change announcement...
+[ReconnectorAdapter] IP change detected, announcing to mesh...
+[AnnouncementManager] Announcing IP change
+[AnnouncementManager] IP change announced
+[ReconnectorAdapter] ✅ IP change announced successfully
+
+## Status Check
+
+> window.networkDetector.getStatusSummary()
+
+Network Status: 🟢 ONLINE
+Connection Type: wifi
+Public IP: 203.0.113.42
+IP Changes: 2
+Connection Changes: 1
+Uptime: 2156s
+
+## Detailed Statistics
+
+> window.networkDetector.getStats()
+
+{
+  isOnline: true,
+  currentConnectionType: "wifi",
+  lastKnownIP: "203.0.113.42",
+  connectionInfo: {
+    effectiveType: "4g",
+    type: "wifi",
+    downlink: 10,
+    rtt: 50,
+    saveData: false
+  },
+  ipChangeCount: 2,
+  connectionTypeChangeCount: 1,
+  onlineCount: 1,
+  offlineCount: 1,
+  lastIpChangeTime: 1700000000000,
+  lastOnlineTime: 1700000150000,
+  lastOfflineTime: 1700000100000,
+  startTime: 1699997844000,
+  totalUptime: 2156000,
+  currentOnlineDuration: 150000,
+  currentOfflineDuration: 0,
+  features: {
+    networkInfo: true,
+    webRTC: true,
+    onlineAPI: true
+  }
+}
+
+## Error Scenarios
+
+### STUN Server Unreachable
+
+[NetworkDetector] Checking public IP...
+[NetworkDetector] Failed to get public IP: TypeError: Failed to fetch
+[NetworkDetector] Could not determine public IP
+
+### Network Information API Unavailable (Firefox/Safari)
+
+[NetworkDetector] Initialized with features: { networkInfo: false, webRTC: true, onLine: true }
+[NetworkDetector] Network Information API not available
+[NetworkDetector] Falling back to online/offline events only
+
+### WebRTC Unavailable
+
+[NetworkDetector] Initialized with features: { networkInfo: true, webRTC: false, onLine: true }
+[NetworkDetector] WebRTC not available, IP change detection disabled
+
+## Cleanup
+
+> window.networkDetector.destroy()
+
+[NetworkDetector] Cleaning up...
+[NetworkDetector] Cleanup complete
+
+## Integration with Mesh Network
+
+[NetworkDetector] 🔄 IP CHANGED: 203.0.113.42 → 203.0.113.99
+[NetworkDetector] Triggering IP change announcement...
+[ReconnectorAdapter] IP change detected, announcing to mesh...
+[AnnouncementManager] Announcing IP change
+[AnnouncementManager] ✅ Valid announcement from Alice
+[AnnouncementManager] Will initiate reconnection to Alice in 1523ms
+[DirectReconnection] Attempting direct reconnection to Alice
+[DirectReconnection] ✅ Direct connection established to Alice
+[MeshNetwork] Peer connected: Alice (total: 3 peers)
+
+## Multiple IP Changes Tracked
+
+[NetworkDetector] 🔄 IP CHANGED: 203.0.113.1 → 203.0.113.2
+[NetworkDetector] 🔄 IP CHANGED: 203.0.113.2 → 203.0.113.3
+[NetworkDetector] 🔄 IP CHANGED: 203.0.113.3 → 203.0.113.4
+
+> window.networkDetector.getStats().ipChangeCount
+4
+
+## Browser Compatibility Messages
+
+### Chrome/Edge (Full Support)
+
+[NetworkDetector] Initialized with features: { networkInfo: true, webRTC: true, onLine: true }
+
+### Firefox (No Network Info API)
+
+[NetworkDetector] Initialized with features: { networkInfo: false, webRTC: true, onLine: true }
+[NetworkDetector] Network Information API not available
+[NetworkDetector] Falling back to online/offline events only
+
+### Safari (No Network Info API)
+
+[NetworkDetector] Initialized with features: { networkInfo: false, webRTC: true, onLine: true }
+[NetworkDetector] Network Information API not available
+[NetworkDetector] Falling back to online/offline events only
