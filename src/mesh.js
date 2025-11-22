@@ -12,7 +12,6 @@ import MasterReconnectionStrategy from './reconnection/master-reconnection.js';
 import { PeerPersistenceManager } from './storage/peer-persistence.js';
 import ReconnectionAuth from './reconnection-auth.js';
 import NetworkChangeDetector from './network/change-detector.js';
-import BilateralReconnectionManager from './reconnection/bilateral-reconnection.js';
 
 // Multi-peer mesh network manager with automatic discovery and routing
 class MeshNetwork {
@@ -81,14 +80,6 @@ class MeshNetwork {
       });
       await this.reconnectionAuth.initialize();
 
-      // Initialize bilateral reconnection manager
-      this.bilateralReconnect = new BilateralReconnectionManager(
-        this.identity,
-        this, // peerManager
-        this.peerPersistence
-      );
-      console.log('[Mesh] Bilateral reconnection manager initialized');
-
       // Initialize master reconnection strategy
       this.masterReconnect = new MasterReconnectionStrategy(
         this.identity,
@@ -119,10 +110,6 @@ class MeshNetwork {
 
       // Start periodic announcements
       this.masterReconnect.announcements.startPeriodicAnnouncements(120000); // 2 minutes
-
-      // Start bilateral reconnection monitoring
-      await this.bilateralReconnect.startMonitoring();
-      console.log('[Mesh] Bilateral reconnection monitoring started');
 
       return true;
     } catch (error) {
@@ -189,6 +176,15 @@ class MeshNetwork {
         this.masterReconnect.topology.handleTopologyResponse(msg);
       });
     }
+
+    // Reconnection credentials exchange handlers
+    this.router.on('reconnection_offer', async (msg) => {
+      await this.handleReconnectionOffer(msg);
+    });
+
+    this.router.on('reconnection_answer', async (msg) => {
+      await this.handleReconnectionAnswer(msg);
+    });
 
     // Identity exchange handler
     this.router.on('identity_exchange', async (msg) => {
@@ -504,6 +500,9 @@ class MeshNetwork {
             if (trustedPeer && trustedPeer.signPublicKey && this.peerPersistence) {
               await this.peerPersistence.updatePeerPublicKey(uuid, trustedPeer.signPublicKey);
             }
+
+            // Exchange reconnection credentials
+            await this.exchangeReconnectionCredentials(peer, uuid);
           } catch (error) {
             console.warn('[Mesh] Failed to exchange identity:', error);
           }
@@ -554,12 +553,6 @@ class MeshNetwork {
         }
 
         this.peers.delete(uuid);
-
-        // Start bilateral reconnection attempt
-        if (this.reconnectionEnabled && this.bilateralReconnect) {
-          console.log(`[Mesh] Starting bilateral reconnection for ${uuid.substring(0, 8)}`);
-          await this.bilateralReconnect.startReconnecting(uuid);
-        }
 
         if (this.onPeerDisconnect) {
           this.onPeerDisconnect(uuid);
@@ -659,6 +652,152 @@ class MeshNetwork {
   getConnectedPeerCount() {
     return Array.from(this.peers.values())
       .filter(data => data.status === 'connected').length;
+  }
+
+  // Exchange reconnection credentials with peer
+  async exchangeReconnectionCredentials(peer, uuid) {
+    try {
+      console.log(`[Mesh] Exchanging reconnection credentials with ${uuid.substring(0, 8)}`);
+
+      // Create a new SimplePeer instance to generate fresh reconnection credentials
+      const reconnectPeer = new SimplePeer({
+        initiator: true,
+        trickle: false,
+        config: ICE_CONFIG
+      });
+
+      // Wait for the offer signal
+      const offer = await new Promise((resolve, reject) => {
+        const timeout = setTimeout(() => reject(new Error('Offer generation timeout')), 10000);
+
+        reconnectPeer.on('signal', (signal) => {
+          clearTimeout(timeout);
+          resolve(signal);
+        });
+
+        reconnectPeer.on('error', (err) => {
+          clearTimeout(timeout);
+          reject(err);
+        });
+      });
+
+      // Destroy the temporary peer (we only needed the offer)
+      reconnectPeer.destroy();
+
+      // Send the reconnection offer to the peer
+      const offerMessage = this.router.createMessage('reconnection_offer', {
+        offer,
+        timestamp: Date.now()
+      }, { targetPeerId: uuid, ttl: 5 });
+
+      this.router.routeMessage(offerMessage);
+
+      // Store our offer temporarily (will be updated with answer when received)
+      if (!this.pendingReconnectionOffers) {
+        this.pendingReconnectionOffers = new Map();
+      }
+      this.pendingReconnectionOffers.set(uuid, { offer, timestamp: Date.now() });
+
+      console.log(`[Mesh] Sent reconnection offer to ${uuid.substring(0, 8)}`);
+    } catch (error) {
+      console.error(`[Mesh] Failed to exchange reconnection credentials with ${uuid.substring(0, 8)}:`, error);
+    }
+  }
+
+  // Handle incoming reconnection offer from a peer
+  async handleReconnectionOffer(msg) {
+    try {
+      const { offer } = msg.payload;
+      const fromPeerId = msg.senderId;
+
+      console.log(`[Mesh] Received reconnection offer from ${fromPeerId.substring(0, 8)}`);
+
+      // Create a new SimplePeer instance as responder
+      const reconnectPeer = new SimplePeer({
+        initiator: false,
+        trickle: false,
+        config: ICE_CONFIG
+      });
+
+      // Wait for the answer signal
+      const answer = await new Promise((resolve, reject) => {
+        const timeout = setTimeout(() => reject(new Error('Answer generation timeout')), 10000);
+
+        reconnectPeer.on('signal', (signal) => {
+          clearTimeout(timeout);
+          resolve(signal);
+        });
+
+        reconnectPeer.on('error', (err) => {
+          clearTimeout(timeout);
+          reject(err);
+        });
+
+        // Signal the offer to generate the answer
+        reconnectPeer.signal(offer);
+      });
+
+      // Destroy the temporary peer
+      reconnectPeer.destroy();
+
+      // Send the answer back to the peer
+      const answerMessage = this.router.createMessage('reconnection_answer', {
+        answer,
+        timestamp: Date.now()
+      }, { targetPeerId: fromPeerId, ttl: 5 });
+
+      this.router.routeMessage(answerMessage);
+
+      // Store the other peer's offer and our answer for future reconnection
+      const reconnectionCreds = {
+        theirOffer: offer,
+        ourAnswer: answer,
+        timestamp: Date.now()
+      };
+
+      await this.peerPersistence.updatePeer(fromPeerId, {
+        reconnectionCredentials: reconnectionCreds
+      });
+
+      console.log(`[Mesh] Sent reconnection answer to ${fromPeerId.substring(0, 8)}`);
+    } catch (error) {
+      console.error(`[Mesh] Failed to handle reconnection offer from ${msg.senderId.substring(0, 8)}:`, error);
+    }
+  }
+
+  // Handle incoming reconnection answer from a peer
+  async handleReconnectionAnswer(msg) {
+    try {
+      const { answer } = msg.payload;
+      const fromPeerId = msg.senderId;
+
+      console.log(`[Mesh] Received reconnection answer from ${fromPeerId.substring(0, 8)}`);
+
+      // Get our pending offer
+      const pending = this.pendingReconnectionOffers?.get(fromPeerId);
+      if (!pending) {
+        console.warn(`[Mesh] No pending reconnection offer for ${fromPeerId.substring(0, 8)}`);
+        return;
+      }
+
+      // Store our offer and their answer for future reconnection
+      const reconnectionCreds = {
+        ourOffer: pending.offer,
+        theirAnswer: answer,
+        timestamp: Date.now()
+      };
+
+      await this.peerPersistence.updatePeer(fromPeerId, {
+        reconnectionCredentials: reconnectionCreds
+      });
+
+      // Clean up pending offer
+      this.pendingReconnectionOffers.delete(fromPeerId);
+
+      console.log(`[Mesh] Stored reconnection credentials for ${fromPeerId.substring(0, 8)}`);
+    } catch (error) {
+      console.error(`[Mesh] Failed to handle reconnection answer from ${msg.senderId.substring(0, 8)}:`, error);
+    }
   }
 
   // Store peer for reconnection
@@ -851,9 +990,6 @@ class MeshNetwork {
 
     // Cleanup reconnection system
     if (this.reconnectionEnabled) {
-      if (this.bilateralReconnect) {
-        this.bilateralReconnect.destroy();
-      }
       if (this.masterReconnect) {
         this.masterReconnect.destroy();
       }

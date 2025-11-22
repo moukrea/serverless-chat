@@ -163,10 +163,26 @@ class DirectReconnectionManager {
         console.log(`[DirectReconnection] Signaling reuse failed: ${signalingResult.reason}`);
       }
 
-      // 5. Try using cached ICE candidates (more reliable but requires new signaling)
-      // Note: This would require the remote peer to also be attempting reconnection
-      // or for the signaling server to forward the connection attempt
-      console.log(`[DirectReconnection] Direct ICE reconnection not implemented (requires bilateral attempt)`);
+      // 5. Try using pre-exchanged reconnection credentials
+      if (cached.reconnectionCredentials) {
+        console.log(`[DirectReconnection] Attempting reconnection with pre-exchanged credentials...`);
+        const credentialsResult = await this.tryReconnectionCredentials(cached, timeout);
+
+        if (credentialsResult.success) {
+          await this.peerPersistence.updateConnectionQuality(peerId, {
+            lastMeasured: Date.now()
+          });
+
+          console.log(`[DirectReconnection] ✓ Reconnected via pre-exchanged credentials in ${Date.now() - startTime}ms`);
+          return {
+            success: true,
+            method: 'pre_exchanged_credentials',
+            duration: Date.now() - startTime
+          };
+        }
+
+        console.log(`[DirectReconnection] Pre-exchanged credentials failed: ${credentialsResult.reason}`);
+      }
 
       // 6. Update failure counter
       await this.peerPersistence.incrementReconnectionAttempts(peerId);
@@ -345,6 +361,130 @@ class DirectReconnectionManager {
           });
           return;
         }
+
+      } catch (error) {
+        finish({
+          success: false,
+          reason: 'exception',
+          error: error.message
+        });
+      }
+    });
+  }
+
+  /**
+   * Try reconnection using pre-exchanged credentials
+   *
+   * Uses the reconnection offer/answer that was exchanged during initial connection.
+   * Each peer has either (ourOffer + theirAnswer) or (theirOffer + ourAnswer).
+   *
+   * @param {Object} cached - Cached connection data with reconnectionCredentials
+   * @param {number} timeout - Timeout in milliseconds
+   * @returns {Promise<{success: boolean, reason: string, peer?: SimplePeer}>}
+   */
+  async tryReconnectionCredentials(cached, timeout) {
+    return new Promise((resolve) => {
+      let peer = null;
+      let timeoutId = null;
+      let resolved = false;
+
+      const cleanup = () => {
+        if (timeoutId) clearTimeout(timeoutId);
+        if (peer && !resolved) {
+          try {
+            peer.destroy();
+          } catch (e) {
+            // Ignore cleanup errors
+          }
+        }
+      };
+
+      const finish = (result) => {
+        if (resolved) return;
+        resolved = true;
+        cleanup();
+        resolve(result);
+      };
+
+      try {
+        const creds = cached.reconnectionCredentials;
+
+        // Determine our role based on which credentials we have
+        let initiator = false;
+        let signalToUse = null;
+
+        if (creds.ourOffer && creds.theirAnswer) {
+          // We have our offer and their answer - we are the initiator
+          initiator = true;
+          signalToUse = creds.theirAnswer;
+        } else if (creds.theirOffer && creds.ourAnswer) {
+          // We have their offer and our answer - we are the responder
+          initiator = false;
+          signalToUse = creds.theirOffer;
+        } else {
+          finish({
+            success: false,
+            reason: 'invalid_credentials_format'
+          });
+          return;
+        }
+
+        console.log(`[DirectReconnection] Using pre-exchanged credentials as ${initiator ? 'initiator' : 'responder'}`);
+
+        peer = new SimplePeer({
+          initiator,
+          trickle: false,
+          config: ICE_CONFIG,
+        });
+
+        // Set timeout
+        timeoutId = setTimeout(() => {
+          finish({
+            success: false,
+            reason: 'timeout'
+          });
+        }, timeout);
+
+        // Handle successful connection
+        peer.on('connect', async () => {
+          console.log('[DirectReconnection] Pre-exchanged credentials successful!');
+
+          // Register peer with mesh
+          if (this.peerManager.registerReconnectedPeer) {
+            await this.peerManager.registerReconnectedPeer(
+              cached.peerId,
+              cached.displayName,
+              peer
+            );
+          }
+
+          finish({
+            success: true,
+            reason: 'connected',
+            peer
+          });
+        });
+
+        // Handle errors
+        peer.on('error', (err) => {
+          console.log(`[DirectReconnection] Credentials error: ${err.message}`);
+          finish({
+            success: false,
+            reason: 'peer_error',
+            error: err.message
+          });
+        });
+
+        // Handle close
+        peer.on('close', () => {
+          finish({
+            success: false,
+            reason: 'peer_closed'
+          });
+        });
+
+        // Signal with the stored credentials
+        peer.signal(signalToUse);
 
       } catch (error) {
         finish({

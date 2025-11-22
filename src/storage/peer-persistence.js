@@ -420,6 +420,21 @@ class PeerPersistenceManager {
     return await this.storePeer(peer);
   }
 
+  /**
+   * Update peer with partial data (merge updates)
+   * @param {string} peerId - Peer ID
+   * @param {Object} updates - Partial peer data to merge
+   * @returns {Promise<boolean>} Success status
+   */
+  async updatePeer(peerId, updates) {
+    const peer = await this.getPeer(peerId);
+    if (!peer) return false;
+
+    // Merge updates into peer object
+    Object.assign(peer, updates);
+    return await this.storePeer(peer);
+  }
+
   // ===========================================================================
   // QUERY OPERATIONS
   // ===========================================================================
