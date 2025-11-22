@@ -90,6 +90,15 @@ export const MASTER_RECONNECTION_CONFIG = {
     ENABLE_PERIODIC_ANNOUNCEMENTS: true,
     ENABLE_TOPOLOGY_DISCOVERY: true,
     UPDATE_PERSISTENCE: true,
+    ENABLE_PERIODIC_RECONNECTION: true,  // Periodic reconnection attempts
+  },
+
+  // Periodic reconnection
+  PERIODIC_RECONNECTION: {
+    INTERVAL: 300000,                    // 5 minutes
+    MAX_ATTEMPTS_PER_CYCLE: 3,           // Try up to 3 peers per cycle
+    MIN_CONNECTIONS_TO_ENABLE: 1,        // Only run if we have at least 1 connection
+    SKIP_IF_RECONNECTING: true,          // Don't run if manual reconnection in progress
   },
 
   // Connection limits
@@ -208,6 +217,7 @@ class MasterReconnectionStrategy {
     // State
     this.isReconnecting = false;
     this.lastReconnectionResult = null;
+    this.periodicReconnectTimer = null;
 
     console.log('[MasterReconnection] Initialized with all child managers');
   }
@@ -686,11 +696,110 @@ class MasterReconnectionStrategy {
         console.log('   ✓ Updated peer persistence records');
       }
 
+      // Start periodic reconnection attempts
+      if (this.config.POST_RECONNECTION.ENABLE_PERIODIC_RECONNECTION) {
+        this.startPeriodicReconnection();
+        console.log('   ✓ Started periodic reconnection');
+      }
+
       console.log('[MasterReconnection] Post-reconnection setup complete');
 
     } catch (error) {
       console.error('[MasterReconnection] Post-reconnection setup error:', error);
       // Non-critical, don't throw
+    }
+  }
+
+  /**
+   * Start periodic reconnection attempts
+   *
+   * Runs in background to periodically check for disconnected peers
+   * and attempt reconnection. This enables:
+   * - Peer A refreshes browser → connects to mesh → periodic task finds Peer B
+   * - Peer B announces presence → Peer A receives via mesh → reconnects
+   *
+   * @returns {void}
+   */
+  startPeriodicReconnection() {
+    if (this.periodicReconnectTimer) {
+      console.log('[MasterReconnection] Periodic reconnection already running');
+      return;
+    }
+
+    const interval = this.config.PERIODIC_RECONNECTION.INTERVAL;
+    console.log(`[MasterReconnection] Starting periodic reconnection (every ${interval / 1000}s)`);
+
+    this.periodicReconnectTimer = setInterval(async () => {
+      try {
+        // Skip if manual reconnection is in progress
+        if (this.config.PERIODIC_RECONNECTION.SKIP_IF_RECONNECTING && this.isReconnecting) {
+          return;
+        }
+
+        // Only run if we have minimum connections
+        const currentConnections = await this.getCurrentConnectionCount();
+        if (currentConnections < this.config.PERIODIC_RECONNECTION.MIN_CONNECTIONS_TO_ENABLE) {
+          return;
+        }
+
+        console.log('[MasterReconnection] Running periodic reconnection check...');
+
+        // Get disconnected peers worth reconnecting to
+        const desiredPeers = await this.getDesiredPeers();
+        const disconnectedPeers = desiredPeers.filter(peer =>
+          !this.peerManager.peers.has(peer.peerId)
+        );
+
+        if (disconnectedPeers.length === 0) {
+          console.log('[MasterReconnection] No disconnected peers to reconnect');
+          return;
+        }
+
+        // Try to reconnect to a few peers
+        const maxAttempts = Math.min(
+          disconnectedPeers.length,
+          this.config.PERIODIC_RECONNECTION.MAX_ATTEMPTS_PER_CYCLE
+        );
+
+        console.log(`[MasterReconnection] Attempting to reconnect to ${maxAttempts} peer(s)...`);
+
+        let successCount = 0;
+        for (let i = 0; i < maxAttempts; i++) {
+          const peer = disconnectedPeers[i];
+
+          // Double-check not connected (may have connected since we checked)
+          if (this.peerManager.peers.has(peer.peerId)) {
+            continue;
+          }
+
+          console.log(`   [${i + 1}/${maxAttempts}] Trying ${peer.displayName}...`);
+          const result = await this.reconnectToPeer(peer);
+
+          if (result.success) {
+            successCount++;
+            console.log(`      ✓ Connected via ${result.method}`);
+          } else {
+            console.log(`      ✗ Failed: ${result.reason}`);
+          }
+        }
+
+        console.log(`[MasterReconnection] Periodic reconnection complete: ${successCount}/${maxAttempts} successful`);
+
+      } catch (error) {
+        console.error('[MasterReconnection] Periodic reconnection error:', error);
+      }
+    }, interval);
+  }
+
+  /**
+   * Stop periodic reconnection attempts
+   * @returns {void}
+   */
+  stopPeriodicReconnection() {
+    if (this.periodicReconnectTimer) {
+      clearInterval(this.periodicReconnectTimer);
+      this.periodicReconnectTimer = null;
+      console.log('[MasterReconnection] Stopped periodic reconnection');
     }
   }
 
@@ -824,6 +933,9 @@ class MasterReconnectionStrategy {
     console.log('[MasterReconnection] Cleaning up reconnection system...');
 
     try {
+      // Stop periodic reconnection
+      this.stopPeriodicReconnection();
+
       // Stop periodic announcements
       this.announcements.stopPeriodicAnnouncements();
 
