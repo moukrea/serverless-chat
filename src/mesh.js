@@ -177,6 +177,37 @@ class MeshNetwork {
       });
     }
 
+    // Identity exchange handler
+    this.router.on('identity_exchange', async (msg) => {
+      if (this.reconnectionAuth) {
+        try {
+          const result = await this.reconnectionAuth.handleIdentityExchange(
+            msg.payload,
+            msg.senderId
+          );
+          if (result.valid) {
+            console.log(`[Mesh] Identity exchange completed with ${msg.senderId.substring(0, 8)}`);
+
+            // Update stored peer with public key and shared secret
+            if (this.peerPersistence) {
+              const trustedPeer = this.reconnectionAuth.trustStore?.getPeer(msg.senderId);
+              const sessionKey = this.reconnectionAuth.sessionKeys?.get(msg.senderId);
+
+              if (trustedPeer && trustedPeer.signPublicKey) {
+                await this.peerPersistence.updatePeerPublicKey(msg.senderId, trustedPeer.signPublicKey);
+              }
+
+              if (sessionKey && sessionKey.sharedSecret) {
+                await this.peerPersistence.updatePeerSharedSecret(msg.senderId, sessionKey.sharedSecret);
+              }
+            }
+          }
+        } catch (error) {
+          console.error('[Mesh] Error handling identity exchange:', error);
+        }
+      }
+    });
+
     console.log('[Mesh] Reconnection message handlers registered');
   }
 
@@ -614,6 +645,29 @@ class MeshNetwork {
   // Store peer for reconnection
   async storePeerForReconnection(uuid, peerData, peer, diagnostics) {
     try {
+      // Extract ICE candidates from diagnostics
+      const cachedCandidates = [];
+      if (diagnostics && diagnostics.candidates) {
+        ['host', 'srflx', 'relay', 'prflx'].forEach(type => {
+          if (diagnostics.candidates[type]) {
+            cachedCandidates.push(...diagnostics.candidates[type].map(c => ({ ...c, category: type })));
+          }
+        });
+      }
+
+      // Extract SDP offer/answer from WebRTC connection
+      let lastOffer = null;
+      let lastAnswer = null;
+      if (peer._pc && peer._pc.localDescription && peer._pc.remoteDescription) {
+        if (peer.initiator) {
+          lastOffer = { type: peer._pc.localDescription.type, sdp: peer._pc.localDescription.sdp };
+          lastAnswer = { type: peer._pc.remoteDescription.type, sdp: peer._pc.remoteDescription.sdp };
+        } else {
+          lastAnswer = { type: peer._pc.localDescription.type, sdp: peer._pc.localDescription.sdp };
+          lastOffer = { type: peer._pc.remoteDescription.type, sdp: peer._pc.remoteDescription.sdp };
+        }
+      }
+
       const peerInfo = {
         peerId: uuid,
         userId: uuid,
@@ -627,6 +681,12 @@ class MeshNetwork {
         // Network information
         lastKnownIP: null,
         iceServers: ICE_CONFIG.iceServers,
+
+        // Cached connection data for direct reconnection
+        cachedCandidates,
+        lastOffer,
+        lastAnswer,
+        wasInitiator: peer.initiator || false,
 
         // Connection quality
         connectionQuality: {
@@ -650,7 +710,7 @@ class MeshNetwork {
       };
 
       await this.peerPersistence.storePeer(peerInfo);
-      console.log(`[Mesh] Stored ${peerData.displayName} for reconnection`);
+      console.log(`[Mesh] Stored ${peerData.displayName} for reconnection (${cachedCandidates.length} ICE candidates)`);
     } catch (error) {
       console.error('[Mesh] Failed to store peer for reconnection:', error);
     }

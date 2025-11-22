@@ -401,6 +401,20 @@ class PeerPersistenceManager {
     return await this.storePeer(peer);
   }
 
+  /**
+   * Update peer's shared secret from session keys
+   * @param {string} peerId - Peer ID
+   * @param {string} sharedSecret - Shared secret (hex string)
+   * @returns {Promise<boolean>} Success status
+   */
+  async updatePeerSharedSecret(peerId, sharedSecret) {
+    const peer = await this.getPeer(peerId);
+    if (!peer) return false;
+
+    peer.sharedSecret = sharedSecret;
+    return await this.storePeer(peer);
+  }
+
   // ===========================================================================
   // QUERY OPERATIONS
   // ===========================================================================
