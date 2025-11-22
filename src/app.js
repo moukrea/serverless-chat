@@ -1023,6 +1023,25 @@ class PWAInstallManager {
 }
 
 // ============================================
+// Service Worker Update Handler
+// ============================================
+
+// Listen for service worker updates and reload the page
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    console.log('[SW] New service worker activated, reloading page to load updated code...');
+
+    // Show notification before reload (optional)
+    addMessage('New version installed. Reloading...', 'system');
+
+    // Force reload to get new code
+    setTimeout(() => {
+      window.location.reload();
+    }, 1000);
+  });
+}
+
+// ============================================
 // Automatic Reconnection
 // ============================================
 
@@ -1033,14 +1052,32 @@ async function initializeReconnection() {
   console.log(`[App] Mesh reconnection ready: ${mesh.reconnectionReady}`);
 
   try {
-    // Check if reconnection is enabled
-    if (!mesh.reconnectionEnabled) {
-      console.warn('[App] Reconnection system not available');
+    // Wait for reconnection system initialization if not ready
+    if (!mesh.reconnectionReady) {
+      console.log('[App] Waiting for reconnection system initialization...');
+      try {
+        await mesh._initPromise;
+        console.log('[App] Reconnection system initialized');
+      } catch (error) {
+        console.error('[App] Reconnection system initialization failed:', error);
+        addMessage('Reconnection system unavailable. Click "New Connection" to connect.', 'system');
+        return;
+      }
+    }
+
+    // Verify reconnection system is properly initialized
+    if (!mesh.reconnectionEnabled || !mesh.masterReconnect) {
+      console.warn('[App] Reconnection system not properly initialized');
+      addMessage('Reconnection disabled. Click "New Connection" to connect.', 'system');
       return;
     }
 
-    // Small delay to let network stabilize
-    await new Promise(resolve => setTimeout(resolve, 1000));
+    // Check if we're online before attempting reconnection
+    if (!navigator.onLine) {
+      console.log('[App] Offline, skipping reconnection attempt');
+      addMessage('You are offline. Reconnection will start when back online.', 'system');
+      return;
+    }
 
     // Attempt reconnection
     const reconnectStart = Date.now();
