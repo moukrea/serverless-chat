@@ -105,13 +105,21 @@ class SecurityManager {
   }
 
   // Sanitize user input
-  sanitizeMessage(text) {
+  sanitizeMessage(text, format = 'plain') {
     if (typeof text !== 'string') return '';
 
-    return text
-      .replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;')
-      .substring(0, 5000); // Max 5000 chars
+    const trimmed = text.trim().substring(0, 5000);
+
+    if (format === 'markdown') {
+      if (/<script|javascript:|data:|vbscript:/i.test(trimmed)) {
+        throw new Error('Invalid content detected');
+      }
+      return trimmed;
+    } else {
+      return trimmed
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;');
+    }
   }
 
   // Violation tracking

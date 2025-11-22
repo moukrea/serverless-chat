@@ -542,7 +542,8 @@ class MeshNetwork {
   handleChatMessage(message) {
     if (this.onMessage) {
       const peerName = this.identity.getPeerDisplayName(message.senderId, message.senderName);
-      this.onMessage(message.senderId, peerName, message.payload.text);
+      const format = message.payload.format || 'plain';
+      this.onMessage(message.senderId, peerName, message.payload.text, format);
     }
   }
 
@@ -563,11 +564,13 @@ class MeshNetwork {
   }
 
   // Send a chat message (routed through mesh)
-  sendMessage(text) {
-    const sanitized = this.securityManager.sanitizeMessage(text);
+  sendMessage(text, format = 'markdown') {
+    const sanitized = this.securityManager.sanitizeMessage(text, format);
 
     const chatMessage = this.router.createMessage('chat', {
-      text: sanitized
+      text: sanitized,
+      format: format,
+      version: '1.0'
     }, { routingHint: 'broadcast' });
 
     this.router.routeMessage(chatMessage);

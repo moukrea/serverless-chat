@@ -4,7 +4,10 @@ globalThis.process = process;
 
 import Identity from './identity.js';
 import MeshNetwork from './mesh.js';
+import MarkdownInput from './components/markdown-input.js';
+import { renderMarkdown } from './utils/markdown-renderer.js';
 import './styles/main.css';
+import './styles/markdown.css';
 
 // Initialize identity and mesh network
 const identity = new Identity();
@@ -191,9 +194,9 @@ mesh.onPeerUpdate = (uuid, displayName) => {
   updatePeersList();
 };
 
-mesh.onMessage = (uuid, displayName, text) => {
+mesh.onMessage = (uuid, displayName, text, format) => {
   const peerName = identity.getPeerDisplayName(uuid, displayName);
-  addMessage(`${peerName}: ${text}`, 'peer', uuid);
+  addMessage(`${peerName}: ${text}`, 'peer', uuid, format);
 };
 
 // ============================================
@@ -377,7 +380,7 @@ function createMessageAvatar(author, type) {
 // Add Message to Chat
 // ============================================
 
-function addMessage(text, type = 'sent', uuid = null) {
+function addMessage(text, type = 'sent', uuid = null, format = 'plain') {
   const messagesContainer = $('messages');
 
   // System messages - keep simple centered format
@@ -407,6 +410,10 @@ function addMessage(text, type = 'sent', uuid = null) {
   if (uuid) {
     messageGroup.dataset.uuid = uuid;
   }
+  if (format) {
+    messageGroup.dataset.format = format;
+    messageGroup.dataset.rawText = messageText;
+  }
 
   // Create avatar
   const avatar = createMessageAvatar(author, type);
@@ -427,13 +434,36 @@ function addMessage(text, type = 'sent', uuid = null) {
   timestamp.className = 'message-timestamp';
   timestamp.textContent = formatTimestamp();
 
+  // Add toggle button for markdown messages
+  if (format === 'markdown') {
+    const toggleBtn = document.createElement('button');
+    toggleBtn.className = 'btn-toggle-raw';
+    toggleBtn.setAttribute('aria-label', 'Toggle raw markdown');
+    toggleBtn.setAttribute('title', 'View raw markdown');
+    toggleBtn.innerHTML = '<i class="ti ti-code"></i>';
+    toggleBtn.addEventListener('click', () => toggleMessageView(messageGroup));
+    header.appendChild(toggleBtn);
+  }
+
   header.appendChild(authorSpan);
   header.appendChild(timestamp);
 
   // Create message text
   const textDiv = document.createElement('div');
   textDiv.className = 'message-text';
-  textDiv.textContent = messageText;
+
+  if (format === 'markdown') {
+    try {
+      const renderedHtml = renderMarkdown(messageText);
+      textDiv.innerHTML = renderedHtml;
+      textDiv.classList.add('markdown-rendered');
+    } catch (error) {
+      console.error('[App] Markdown rendering error:', error);
+      textDiv.textContent = messageText;
+    }
+  } else {
+    textDiv.textContent = messageText;
+  }
 
   // Assemble message
   content.appendChild(header);
@@ -444,6 +474,31 @@ function addMessage(text, type = 'sent', uuid = null) {
 
   messagesContainer.appendChild(messageGroup);
   messagesContainer.scrollTop = messagesContainer.scrollHeight;
+}
+
+function toggleMessageView(messageGroup) {
+  const textDiv = messageGroup.querySelector('.message-text');
+  const rawText = messageGroup.dataset.rawText;
+  const toggleBtn = messageGroup.querySelector('.btn-toggle-raw');
+
+  if (!textDiv || !rawText || !toggleBtn) return;
+
+  const isShowingRaw = textDiv.classList.contains('showing-raw');
+
+  if (isShowingRaw) {
+    const renderedHtml = renderMarkdown(rawText);
+    textDiv.innerHTML = renderedHtml;
+    textDiv.classList.remove('showing-raw');
+    textDiv.classList.add('markdown-rendered');
+    toggleBtn.innerHTML = '<i class="ti ti-code"></i>';
+    toggleBtn.setAttribute('title', 'View raw markdown');
+  } else {
+    textDiv.textContent = rawText;
+    textDiv.classList.add('showing-raw');
+    textDiv.classList.remove('markdown-rendered');
+    toggleBtn.innerHTML = '<i class="ti ti-eye"></i>';
+    toggleBtn.setAttribute('title', 'View rendered markdown');
+  }
 }
 
 // ============================================
@@ -591,12 +646,17 @@ $('btnAcceptAnswer').onclick = () => {
 // Send Message
 // ============================================
 
+let markdownInput;
+
 $('btnSend').onclick = () => {
   const text = $('messageInput').value.trim();
   if (text && mesh.getConnectedPeers().length > 0) {
-    mesh.sendMessage(text);
-    addMessage(`You: ${text}`, 'sent');
+    mesh.sendMessage(text, 'markdown');
+    addMessage(`You: ${text}`, 'sent', null, 'markdown');
     $('messageInput').value = '';
+    if (markdownInput) {
+      markdownInput.clearPreview();
+    }
 
     // Close mobile menu if open
     if (window.innerWidth <= 768) {
@@ -1195,6 +1255,17 @@ $('btnSend').disabled = true;
 
 // Welcome message
 addMessage('Welcome! Your identity has been created.', 'system');
+
+// Initialize markdown input component
+try {
+  markdownInput = new MarkdownInput('messageInput', {
+    mode: 'hybrid',
+    debounceDelay: 300
+  });
+  console.log('[App] Markdown input initialized');
+} catch (error) {
+  console.error('[App] Failed to initialize markdown input:', error);
+}
 
 // Start automatic reconnection
 if (document.readyState === 'loading') {
