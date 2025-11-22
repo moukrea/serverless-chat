@@ -11,25 +11,17 @@ export class PeerContext {
   }
 
   async initialize({ usePersistentContext = false, storageState = null } = {}) {
-    if (usePersistentContext) {
-      this.context = await this.browser.launchPersistentContext(this.userDataDir, {
-        viewport: { width: 1280, height: 720 },
-        permissions: ['clipboard-read', 'clipboard-write']
-      });
-      this.page = this.context.pages()[0] || await this.context.newPage();
-    } else {
-      const contextOptions = {
-        viewport: { width: 1280, height: 720 },
-        permissions: ['clipboard-read', 'clipboard-write']
-      };
+    const contextOptions = {
+      viewport: { width: 1280, height: 720 },
+      permissions: ['clipboard-read', 'clipboard-write']
+    };
 
-      if (storageState) {
-        contextOptions.storageState = storageState;
-      }
-
-      this.context = await this.browser.newContext(contextOptions);
-      this.page = await this.context.newPage();
+    if (storageState) {
+      contextOptions.storageState = storageState;
     }
+
+    this.context = await this.browser.newContext(contextOptions);
+    this.page = await this.context.newPage();
 
     return this.page;
   }

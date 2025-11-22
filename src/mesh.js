@@ -52,11 +52,6 @@ class MeshNetwork {
     this.router.on('ping', (msg) => this.latencyManager.handlePing(msg));
     this.router.on('pong', (msg) => this.latencyManager.handlePong(msg));
 
-    // Register reconnection message handlers
-    if (this.reconnectionEnabled) {
-      this.registerReconnectionHandlers();
-    }
-
     console.log('[Mesh] Network initialized with routing subsystems');
     if (this.reconnectionEnabled) {
       console.log('[Mesh] Reconnection system enabled');
@@ -100,6 +95,9 @@ class MeshNetwork {
 
       this.networkDetector = new NetworkChangeDetector(reconnectorAdapter);
       this.networkDetector.initialize();
+
+      // Register reconnection message handlers now that everything is initialized
+      this.registerReconnectionHandlers();
 
       console.log('[Mesh] Reconnection system initialized successfully');
 

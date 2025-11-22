@@ -10,6 +10,10 @@ import './styles/main.css';
 const identity = new Identity();
 const mesh = new MeshNetwork(identity);
 
+// Expose for testing/debugging
+window.mesh = mesh;
+window.identity = identity;
+
 // Helper function
 const $ = (id) => document.getElementById(id);
 
