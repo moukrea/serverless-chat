@@ -1027,7 +1027,10 @@ class PWAInstallManager {
 // ============================================
 
 async function initializeReconnection() {
+  const startTime = Date.now();
   console.log('[App] Initializing automatic reconnection...');
+  console.log(`[App] Document ready state: ${document.readyState}`);
+  console.log(`[App] Mesh reconnection ready: ${mesh.reconnectionReady}`);
 
   try {
     // Check if reconnection is enabled
@@ -1040,15 +1043,19 @@ async function initializeReconnection() {
     await new Promise(resolve => setTimeout(resolve, 1000));
 
     // Attempt reconnection
+    const reconnectStart = Date.now();
     const result = await mesh.reconnectToMesh();
+    const reconnectTime = Date.now() - reconnectStart;
 
     if (result.method === 'fallback_required') {
       // All automatic reconnection failed, show manual pairing UI
-      console.log('[App] Automatic reconnection failed, showing pairing UI');
+      const totalTime = Date.now() - startTime;
+      console.log(`[App] Automatic reconnection failed (total: ${totalTime}ms, reconnect: ${reconnectTime}ms)`);
       addMessage('No saved connections found. Click "New Connection" to connect.', 'system');
     } else if (result.peersConnected > 0) {
       // Successfully reconnected
-      console.log(`[App] Reconnected to ${result.peersConnected} peer(s)`);
+      const totalTime = Date.now() - startTime;
+      console.log(`[App] Reconnected to ${result.peersConnected} peer(s) (total: ${totalTime}ms, reconnect: ${reconnectTime}ms)`);
       addMessage(`Reconnected to ${result.peersConnected} peer(s) automatically!`, 'system');
 
       // Enable UI
@@ -1056,11 +1063,13 @@ async function initializeReconnection() {
       $('btnSend').disabled = false;
     } else {
       // No peers to reconnect to
-      console.log('[App] No peers available for reconnection');
+      const totalTime = Date.now() - startTime;
+      console.log(`[App] No peers available for reconnection (total: ${totalTime}ms, reconnect: ${reconnectTime}ms)`);
       addMessage('No saved connections. Click "New Connection" to connect.', 'system');
     }
   } catch (error) {
-    console.error('[App] Reconnection failed:', error);
+    const totalTime = Date.now() - startTime;
+    console.error(`[App] Reconnection failed after ${totalTime}ms:`, error);
     addMessage('Reconnection error. Click "New Connection" to connect manually.', 'system');
   }
 }
@@ -1151,6 +1160,9 @@ $('btnSend').disabled = true;
 addMessage('Welcome! Your identity has been created.', 'system');
 
 // Start automatic reconnection
-window.addEventListener('DOMContentLoaded', () => {
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', initializeReconnection);
+} else {
+  // DOM already loaded, call immediately
   initializeReconnection();
-});
+}

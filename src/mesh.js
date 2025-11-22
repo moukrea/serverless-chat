@@ -32,9 +32,10 @@ class MeshNetwork {
     this.connectionManager = new ConnectionManager(identity);
     this.securityManager = new SecurityManager();
 
-    // Initialize reconnection system
+    // Initialize reconnection system (async)
     this.reconnectionEnabled = true;
-    this.initializeReconnectionSystem();
+    this.reconnectionReady = false; // Flag to track initialization completion
+    this._initPromise = this.initializeReconnectionSystem();
 
     // Wire up subsystems
     this.router.setPeerManager(this);
@@ -60,6 +61,7 @@ class MeshNetwork {
 
   // Initialize reconnection system
   async initializeReconnectionSystem() {
+    const startTime = Date.now();
     try {
       console.log('[Mesh] Initializing reconnection system...');
 
@@ -99,7 +101,11 @@ class MeshNetwork {
       // Register reconnection message handlers now that everything is initialized
       this.registerReconnectionHandlers();
 
-      console.log('[Mesh] Reconnection system initialized successfully');
+      const initTime = Date.now() - startTime;
+      console.log(`[Mesh] Reconnection system initialized successfully in ${initTime}ms`);
+
+      // Mark as ready
+      this.reconnectionReady = true;
 
       // Start periodic announcements
       this.masterReconnect.announcements.startPeriodicAnnouncements(120000); // 2 minutes
@@ -108,6 +114,7 @@ class MeshNetwork {
     } catch (error) {
       console.error('[Mesh] Failed to initialize reconnection system:', error);
       this.reconnectionEnabled = false;
+      this.reconnectionReady = false;
       return false;
     }
   }
@@ -637,9 +644,20 @@ class MeshNetwork {
 
   // Attempt to reconnect to all known peers
   async reconnectToMesh() {
-    if (!this.reconnectionEnabled || !this.masterReconnect) {
-      console.warn('[Mesh] Reconnection system not enabled');
-      return { success: false, reason: 'not_enabled' };
+    // Wait for initialization if still pending
+    if (!this.reconnectionReady && this._initPromise) {
+      console.log('[Mesh] Waiting for reconnection system initialization...');
+      await this._initPromise;
+    }
+
+    if (!this.reconnectionEnabled) {
+      console.warn('[Mesh] Reconnection system disabled (initialization failed)');
+      return { success: false, reason: 'disabled' };
+    }
+
+    if (!this.masterReconnect) {
+      console.error('[Mesh] Reconnection system not properly initialized');
+      return { success: false, reason: 'not_initialized' };
     }
 
     console.log('[Mesh] Starting mesh reconnection...');
