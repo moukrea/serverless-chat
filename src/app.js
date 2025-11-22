@@ -5,7 +5,7 @@ globalThis.process = process;
 import Identity from './identity.js';
 import MeshNetwork from './mesh.js';
 import MarkdownInput from './components/markdown-input.js';
-import { renderMarkdown, renderStyledMarkdown } from './utils/markdown-renderer.js';
+import { renderMarkdown, renderStyledMarkdown, detectMarkdownSyntax } from './utils/markdown-renderer.js';
 import './styles/main.css';
 import './styles/markdown.css';
 
@@ -437,7 +437,7 @@ function addMessage(text, type = 'sent', uuid = null, format = 'plain') {
   header.appendChild(authorSpan);
   header.appendChild(timestamp);
 
-  if (format === 'markdown') {
+  if (format === 'markdown' && detectMarkdownSyntax(messageText)) {
     const toggleBtn = document.createElement('button');
     toggleBtn.className = 'btn-toggle-raw';
     toggleBtn.setAttribute('aria-label', 'Toggle raw markdown');
@@ -665,7 +665,7 @@ $('btnSend').onclick = () => {
   }
 };
 
-$('messageInput').onkeypress = (e) => {
+$('messageInput').addEventListener('keydown', (e) => {
   const isMobile = window.innerWidth <= 768;
 
   if (e.key === 'Enter') {
@@ -678,7 +678,7 @@ $('messageInput').onkeypress = (e) => {
       $('btnSend').click();
     }
   }
-};
+});
 
 // ============================================
 // Theme Toggle

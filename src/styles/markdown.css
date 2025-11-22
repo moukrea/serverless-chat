@@ -56,7 +56,7 @@
 }
 
 .message-input.preview-active {
-  color: rgba(var(--text-primary-rgb, 242, 243, 245), 0.25);
+  color: transparent;
   caret-color: var(--text-primary);
 }
 
