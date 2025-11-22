@@ -387,6 +387,20 @@ class PeerPersistenceManager {
     return await this.storePeer(peer);
   }
 
+  /**
+   * Update peer's public key from trust store
+   * @param {string} peerId - Peer ID
+   * @param {Object} publicKey - Public key (JWK format)
+   * @returns {Promise<boolean>} Success status
+   */
+  async updatePeerPublicKey(peerId, publicKey) {
+    const peer = await this.getPeer(peerId);
+    if (!peer) return false;
+
+    peer.publicKey = JSON.stringify(publicKey);
+    return await this.storePeer(peer);
+  }
+
   // ===========================================================================
   // QUERY OPERATIONS
   // ===========================================================================
@@ -482,12 +496,14 @@ class PeerPersistenceManager {
     const {
       limit = 10,
       maxAge = 7 * 24 * 60 * 60 * 1000, // 7 days
+      minQuality = 0,
     } = options;
 
     const peers = await this.queryPeers({
       sortBy: 'quality',
       limit: limit * 2, // Get more for scoring
       maxAge,
+      minQuality,
       excludeBlacklisted: true,
     });
 

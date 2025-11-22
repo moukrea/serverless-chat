@@ -30,24 +30,43 @@ function generateDisplayName() {
 
 class Identity {
   constructor() {
-    this.load();
+    this.isNew = this.load();
   }
 
   load() {
-    const stored = localStorage.getItem('p2p_identity');
-    if (stored) {
-      const data = JSON.parse(stored);
-      this.uuid = data.uuid;
-      this.displayName = data.displayName;
-    } else {
+    try {
+      let isNew = false;
+      const stored = localStorage.getItem('p2p_identity');
+      if (stored) {
+        const data = JSON.parse(stored);
+        this.uuid = data.uuid;
+        this.displayName = data.displayName;
+        console.log('[Identity] Loaded existing identity from storage');
+      } else {
+        this.uuid = generateUUID();
+        this.displayName = generateDisplayName();
+        this.save();
+        isNew = true;
+        console.log('[Identity] Created new identity');
+      }
+
+      // Load custom peer renames
+      const renames = localStorage.getItem('p2p_peer_renames');
+      this.peerRenames = renames ? JSON.parse(renames) : {};
+
+      return isNew;
+    } catch (error) {
+      console.error('[Identity] Failed to load identity from storage:', error);
       this.uuid = generateUUID();
       this.displayName = generateDisplayName();
-      this.save();
+      this.peerRenames = {};
+      try {
+        this.save();
+      } catch (saveError) {
+        console.error('[Identity] Failed to save recovered identity:', saveError);
+      }
+      return true;
     }
-
-    // Load custom peer renames
-    const renames = localStorage.getItem('p2p_peer_renames');
-    this.peerRenames = renames ? JSON.parse(renames) : {};
   }
 
   save() {

@@ -1261,8 +1261,10 @@ const pwaInstallManager = new PWAInstallManager();
 $('messageInput').disabled = true;
 $('btnSend').disabled = true;
 
-// Welcome message
-addMessage('Welcome! Your identity has been created.', 'system');
+// Welcome message only for new identities
+if (identity.isNew) {
+  addMessage('Welcome! Your identity has been created.', 'system');
+}
 
 // Initialize markdown input component
 try {

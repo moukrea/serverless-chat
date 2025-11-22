@@ -78,6 +78,7 @@ class MeshNetwork {
         peerId: this.identity.uuid,
         displayName: this.identity.displayName
       });
+      await this.reconnectionAuth.initialize();
 
       // Initialize master reconnection strategy
       this.masterReconnect = new MasterReconnectionStrategy(
@@ -453,6 +454,12 @@ class MeshNetwork {
           try {
             await this.reconnectionAuth.exchangeIdentity(peer, uuid);
             console.log(`[Mesh] Identity exchanged with ${peerData.displayName}`);
+
+            // Update stored peer with public key from trust store
+            const trustedPeer = this.reconnectionAuth.trustStore?.getPeer(uuid);
+            if (trustedPeer && trustedPeer.signPublicKey && this.peerPersistence) {
+              await this.peerPersistence.updatePeerPublicKey(uuid, trustedPeer.signPublicKey);
+            }
           } catch (error) {
             console.warn('[Mesh] Failed to exchange identity:', error);
           }
@@ -614,8 +621,8 @@ class MeshNetwork {
         lastSeen: Date.now(),
         lastConnected: Date.now(),
 
-        // Cryptographic keys
-        publicKey: this.identity.keys?.publicKey || null,
+        // Cryptographic keys (peer's public key will be stored in trust store during identity exchange)
+        publicKey: null,
 
         // Network information
         lastKnownIP: null,
