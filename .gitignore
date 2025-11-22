@@ -5,3 +5,5 @@ dist
 .vite
 .temp/
 dev-dist/
+test-results/
+playwright-report/
