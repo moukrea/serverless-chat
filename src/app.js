@@ -1084,7 +1084,7 @@ async function initializeReconnection() {
     const result = await mesh.reconnectToMesh();
     const reconnectTime = Date.now() - reconnectStart;
 
-    if (result.method === 'fallback_required') {
+    if (result.fallbackRequired || result.method === 'cold_start_failed') {
       // All automatic reconnection failed, show manual pairing UI
       const totalTime = Date.now() - startTime;
       console.log(`[App] Automatic reconnection failed (total: ${totalTime}ms, reconnect: ${reconnectTime}ms)`);

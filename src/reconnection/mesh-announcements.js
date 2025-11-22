@@ -446,20 +446,6 @@ class MeshAnnouncementManager {
    * @returns {boolean} True if we should reconnect
    */
   shouldReconnectToPeer(peerId, knownPeer) {
-    // Check if peer is in approved peers
-    const approvedPeer = this.identity.approvedPeers[peerId];
-
-    if (!approvedPeer) {
-      console.log(`[AnnouncementManager] Peer ${peerId.substring(0, 8)} not in approved peers`);
-      return false;
-    }
-
-    // Check approval status
-    if (approvedPeer.status !== 'full') {
-      console.log(`[AnnouncementManager] Peer ${peerId.substring(0, 8)} not fully approved (status: ${approvedPeer.status})`);
-      return false;
-    }
-
     // Check if already connected
     const existingPeer = this.peerManager.peers.get(peerId);
     if (existingPeer && (existingPeer.status === 'connected' || existingPeer.status === 'connecting')) {

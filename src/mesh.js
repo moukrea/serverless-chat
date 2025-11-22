@@ -621,8 +621,12 @@ class MeshNetwork {
         // Connection quality
         connectionQuality: {
           latency: peerData.latency || null,
+          successRate: 1.0, // 100% success on first connection
           connectionType: peerData.connectionType || 'unknown',
-          lastMeasured: Date.now()
+          lastMeasured: Date.now(),
+          totalConnections: 1,
+          successfulConnections: 1,
+          avgUptime: 0 // Will be calculated on subsequent connections
         },
 
         // Metadata
