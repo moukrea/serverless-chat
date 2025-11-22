@@ -614,21 +614,9 @@ class MasterReconnectionStrategy {
    */
   async getDesiredPeers() {
     try {
-      // Get approved peers from identity
-      const approvedPeerIds = Object.keys(this.identity.approvedPeers || {})
-        .filter(peerId => {
-          const approval = this.identity.approvedPeers[peerId];
-          return approval && approval.status === 'full';
-        });
-
-      if (approvedPeerIds.length === 0) {
-        console.log('[MasterReconnection] No approved peers found');
-        return [];
-      }
-
       // Get high-quality reconnection candidates from persistence
       const candidates = await this.peerPersistence.getReconnectionCandidates({
-        limit: 20, // Get more than we need for filtering
+        limit: 20, // Get top 20 quality candidates
         maxAge: 7 * 24 * 60 * 60 * 1000, // Last 7 days
         minQuality: 20, // Reasonable quality threshold
       });
@@ -638,14 +626,12 @@ class MasterReconnectionStrategy {
         return [];
       }
 
-      // Filter to only approved peers
-      const approvedCandidates = candidates
-        .filter(c => approvedPeerIds.includes(c.peer.peerId))
-        .map(c => c.peer);
+      // Extract peer objects from candidates
+      const peers = candidates.map(c => c.peer);
 
-      console.log(`[MasterReconnection] Selected ${approvedCandidates.length} approved candidates`);
+      console.log(`[MasterReconnection] Selected ${peers.length} reconnection candidates`);
 
-      return approvedCandidates;
+      return peers;
 
     } catch (error) {
       console.error('[MasterReconnection] Error getting desired peers:', error);
