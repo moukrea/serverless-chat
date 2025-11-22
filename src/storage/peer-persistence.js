@@ -378,8 +378,13 @@ class PeerPersistenceManager {
 
     peer.reconnectionAttempts = (peer.reconnectionAttempts || 0) + 1;
 
-    // Blacklist if too many failures
-    if (peer.reconnectionAttempts >= STORAGE_CONFIG.RETENTION.FAILED_ATTEMPTS) {
+    // Only blacklist peers that have NEVER successfully connected
+    // Don't blacklist peers from previous successful sessions
+    const hasSuccessfulHistory = peer.connectionQuality &&
+                                 peer.connectionQuality.successfulConnections > 0;
+
+    if (!hasSuccessfulHistory &&
+        peer.reconnectionAttempts >= STORAGE_CONFIG.RETENTION.FAILED_ATTEMPTS) {
       peer.blacklistUntil = Date.now() + STORAGE_CONFIG.RETENTION.BLACKLIST_DURATION;
       console.log(`[PeerPersistence] Blacklisted peer ${peerId.substring(0, 8)} until ${new Date(peer.blacklistUntil).toLocaleString()}`);
     }
