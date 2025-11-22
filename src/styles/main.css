@@ -576,6 +576,38 @@ body {
   font-size: 18px;
 }
 
+.btn-clear-data {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--spacing-sm);
+  padding: var(--spacing-md);
+  background-color: var(--accent-danger);
+  color: var(--text-on-accent);
+  border: none;
+  border-radius: var(--radius-md);
+  font-weight: 600;
+  font-size: 14px;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  margin-top: var(--spacing-md);
+}
+
+.btn-clear-data:hover {
+  background-color: #dc2626;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 8px var(--shadow-hover);
+}
+
+.btn-clear-data:active {
+  transform: translateY(0);
+}
+
+.btn-clear-data i {
+  font-size: 18px;
+}
+
 /* PWA Install Button */
 .btn-install-app {
   width: 100%;

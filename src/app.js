@@ -518,6 +518,27 @@ $('btnNewConnection').onclick = () => {
   openConnectionModal();
 };
 
+$('btnClearData').onclick = () => {
+  if (confirm('Are you sure you want to clear ALL data? This will:\n\n• Delete your identity\n• Delete all saved peers\n• Delete all reconnection data\n• Clear all settings\n\nThis action cannot be undone. The page will reload after clearing.')) {
+    try {
+      console.log('[App] Clearing all localStorage data...');
+
+      const itemCount = localStorage.length;
+      localStorage.clear();
+
+      console.log(`[App] Cleared ${itemCount} localStorage items`);
+      addMessage(`All data cleared (${itemCount} items). Reloading...`, 'system');
+
+      setTimeout(() => {
+        window.location.reload();
+      }, 1000);
+    } catch (error) {
+      console.error('[App] Error clearing data:', error);
+      alert('Error clearing data: ' + error.message);
+    }
+  }
+};
+
 $('btnCloseModal').onclick = () => {
   closeConnectionModal();
 };
