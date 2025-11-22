@@ -96,7 +96,7 @@ export function renderStyledMarkdown(text) {
   }
 
   const lines = text.split('\n');
-  const styledLines = lines.map(line => {
+  const styledLines = lines.map((line, index, array) => {
     let styled = escapeHtml(line);
 
     styled = styled.replace(/^(#{1,6})\s+(.+)$/g, (match, hashes, content) => {
@@ -122,8 +122,16 @@ export function renderStyledMarkdown(text) {
 
     styled = styled.replace(/^(```)(.*)$/g, '<span class="md-codeblock"><span class="md-syntax">$1</span><span class="md-codeblock-lang">$2</span></span>');
 
-    return styled;
+    if (!styled.trim() && index < array.length - 1) {
+      return '<div class="md-line-break">&nbsp;</div>';
+    }
+
+    if (styled.includes('class="md-')) {
+      return styled;
+    }
+
+    return styled ? `<div class="md-line">${styled}</div>` : '';
   });
 
-  return styledLines.join('\n');
+  return styledLines.filter(Boolean).join('');
 }

@@ -36,11 +36,14 @@ class MarkdownInput {
 
   attachEventListeners() {
     this.textarea.addEventListener('input', () => this.handleInput());
+    this.textarea.addEventListener('scroll', () => this.syncScroll(), { passive: true });
     this.textarea.addEventListener('focus', () => this.handleFocus());
     this.textarea.addEventListener('blur', () => this.handleBlur());
   }
 
   handleInput() {
+    this.autoResize();
+
     if (this.debounceTimer) {
       clearTimeout(this.debounceTimer);
     }
@@ -60,6 +63,20 @@ class MarkdownInput {
 
   handleBlur() {
     this.textarea.parentElement.classList.remove('focused');
+  }
+
+  syncScroll() {
+    if (!this.previewElement) return;
+    const scrollTop = this.textarea.scrollTop;
+    const scrollLeft = this.textarea.scrollLeft;
+    this.previewElement.style.transform = `translate(-${scrollLeft}px, -${scrollTop}px)`;
+  }
+
+  autoResize() {
+    const maxHeight = 144;
+    this.textarea.style.height = 'auto';
+    const newHeight = Math.min(this.textarea.scrollHeight, maxHeight);
+    this.textarea.style.height = newHeight + 'px';
   }
 
   updatePreview() {
@@ -108,6 +125,7 @@ class MarkdownInput {
 
   setValue(value) {
     this.textarea.value = value;
+    this.autoResize();
     this.updatePreview();
   }
 

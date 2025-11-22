@@ -2,6 +2,7 @@
 
 .message-input-wrapper {
   position: relative;
+  display: grid;
 }
 
 .btn-preview-toggle {
@@ -32,23 +33,57 @@
   font-size: 18px;
 }
 
+.message-input,
 .message-preview {
-  position: absolute;
-  top: 8px;
-  left: 12px;
-  right: 12px;
-  bottom: auto;
-  pointer-events: none;
-  color: var(--text-primary);
+  grid-area: 1 / 1;
+
+  /* Identical typography */
+  font-family: inherit;
+  font-size: 15px;
+  font-weight: 400;
+  line-height: 1.5;
+  letter-spacing: 0;
+
+  /* Identical spacing with EM units */
+  padding: 0.5333em;
+  border: 1px solid transparent;
+
+  /* Identical box model */
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 2.8em;
+  max-height: 9.6em;
+
+  /* Identical text behavior */
   white-space: pre-wrap;
   word-wrap: break-word;
-  overflow: hidden;
+  overflow-wrap: break-word;
+  text-align: left;
+
+  /* Browser-specific polish */
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+
+.message-input {
+  background: transparent;
+  color: transparent;
+  caret-color: var(--text-primary);
+  resize: none;
+  overflow-y: auto;
+  overflow-x: hidden;
   z-index: 2;
+}
+
+.message-preview {
+  pointer-events: none;
+  overflow: hidden;
+  z-index: 1;
+  color: var(--text-primary);
   opacity: 0;
   transition: opacity var(--transition-fast);
-  padding: var(--spacing-sm);
-  line-height: 1.5;
-  font-size: 15px;
+  will-change: transform;
 }
 
 .message-preview.active {
@@ -310,6 +345,15 @@
 
 /* Styled Markdown Syntax (shows syntax with styling) */
 
+.styled-markdown .md-line {
+  display: block;
+}
+
+.styled-markdown .md-line-break {
+  display: block;
+  height: 1.5em;
+}
+
 .styled-markdown .md-syntax {
   color: var(--text-muted);
   opacity: 0.5;
@@ -351,6 +395,46 @@
   font-weight: 700;
   line-height: 1.3;
   margin: var(--spacing-sm) 0;
+}
+
+/* Input Preview Overlay: Normalize for cursor alignment */
+.message-input-wrapper .message-preview .md-h1,
+.message-input-wrapper .message-preview .md-h2,
+.message-input-wrapper .message-preview .md-h3,
+.message-input-wrapper .message-preview .md-h4,
+.message-input-wrapper .message-preview .md-h5,
+.message-input-wrapper .message-preview .md-h6 {
+  display: inline;
+  font-size: 1em;
+  margin: 0;
+  border: none;
+  padding: 0;
+}
+
+.message-input-wrapper .message-preview .md-h1-text,
+.message-input-wrapper .message-preview .md-h2-text,
+.message-input-wrapper .message-preview .md-h3-text {
+  font-weight: 700;
+}
+
+.message-input-wrapper .message-preview .md-list,
+.message-input-wrapper .message-preview .md-blockquote,
+.message-input-wrapper .message-preview .md-codeblock {
+  display: inline;
+  margin: 0;
+  padding: 0;
+  border: none;
+  background: none;
+}
+
+.message-input-wrapper .message-preview .md-code {
+  background-color: rgba(var(--bg-tertiary-rgb, 30, 31, 34), 0.3);
+  padding: 1px 3px;
+}
+
+.message-input-wrapper .message-preview .md-code-text {
+  font-family: inherit;
+  font-size: 1em;
 }
 
 .styled-markdown .md-bold-text {
