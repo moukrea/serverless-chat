@@ -1,0 +1,340 @@
+name: Test Suite
+
+on:
+  push:
+    branches:
+      - main
+      - 'claude/**'
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  checks: write
+
+env:
+  NODE_VERSION: '20'
+
+jobs:
+  smoke-tests:
+    name: Smoke Tests (Fast)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Playwright browsers
+        run: npx playwright install chromium --with-deps
+
+      - name: Run smoke tests
+        run: npm test -- smoke.spec.js console-check.spec.js
+        env:
+          CI: true
+
+      - name: Upload smoke test report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: smoke-test-report
+          path: |
+            playwright-report/
+            test-results/
+          retention-days: 7
+
+  unit-tests:
+    name: Unit & Feature Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    needs: smoke-tests
+
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2]
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Playwright browsers
+        run: npx playwright install chromium --with-deps
+
+      - name: Run feature tests (shard ${{ matrix.shard }})
+        run: |
+          npm test -- \
+            --shard=${{ matrix.shard }}/2 \
+            --grep-invert "reconnection|persistent.*storage" \
+            --reporter=html,json
+        env:
+          CI: true
+
+      - name: Upload test results (shard ${{ matrix.shard }})
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: feature-test-results-${{ matrix.shard }}
+          path: |
+            playwright-report/
+            test-results/
+          retention-days: 14
+
+  reconnection-tests:
+    name: Reconnection Suite
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    needs: smoke-tests
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Playwright browsers
+        run: npx playwright install chromium --with-deps
+
+      - name: Run reconnection tests
+        run: npm test -- reconnection.spec.js --reporter=html,json
+        env:
+          CI: true
+
+      - name: Upload reconnection test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: reconnection-test-results
+          path: |
+            playwright-report/
+            test-results/
+          retention-days: 30
+
+      - name: Upload reconnection traces
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: reconnection-traces
+          path: test-results/**/*trace.zip
+          retention-days: 30
+
+  stability-tests:
+    name: Long-Running Stability Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    needs: smoke-tests
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Playwright browsers
+        run: npx playwright install chromium --with-deps
+
+      - name: Run persistent storage tests
+        run: npm test -- persistent-storage.spec.js --reporter=html,json
+        env:
+          CI: true
+
+      - name: Upload stability test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: stability-test-results
+          path: |
+            playwright-report/
+            test-results/
+          retention-days: 30
+
+  production-build-tests:
+    name: Production Build Testing
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    needs: smoke-tests
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build production bundle
+        run: npm run build
+
+      - name: Verify build output
+        run: |
+          test -d dist || exit 1
+          test -f dist/index.html || exit 1
+          test -f dist/sw.js || exit 1
+          ls -lh dist/assets/*.js
+          ls -lh dist/assets/*.css
+
+      - name: Analyze bundle size
+        run: |
+          echo "### Bundle Size Report" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+          du -sh dist >> $GITHUB_STEP_SUMMARY
+          du -sh dist/assets/*.js | sort -h >> $GITHUB_STEP_SUMMARY
+          du -sh dist/assets/*.css | sort -h >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+
+      - name: Install Playwright browsers
+        run: npx playwright install chromium --with-deps
+
+      - name: Test production build
+        run: |
+          npm test -- smoke.spec.js --reporter=html,json
+        env:
+          CI: true
+          PLAYWRIGHT_BASE_URL: http://localhost:4173/serverless-chat/
+
+      - name: Start preview server for production tests
+        run: |
+          npx vite preview --port 4173 --strictPort &
+          sleep 5
+          curl -f http://localhost:4173/serverless-chat/ || exit 1
+
+      - name: Run production smoke tests
+        run: npm test -- smoke.spec.js --reporter=html
+        env:
+          CI: true
+
+      - name: Upload production test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: production-test-results
+          path: |
+            playwright-report/
+            test-results/
+          retention-days: 14
+
+      - name: Upload build artifacts
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: production-build
+          path: dist/
+          retention-days: 7
+
+  multi-browser-tests:
+    name: Multi-Browser Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    needs: [unit-tests, reconnection-tests]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+
+    strategy:
+      fail-fast: false
+      matrix:
+        browser: [chromium, firefox, webkit]
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Playwright browsers
+        run: npx playwright install ${{ matrix.browser }} --with-deps
+
+      - name: Run tests on ${{ matrix.browser }}
+        run: |
+          npm test -- \
+            --project=${{ matrix.browser }} \
+            --grep-invert "persistent.*storage" \
+            --reporter=html,json
+        env:
+          CI: true
+
+      - name: Upload browser test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.browser }}-test-results
+          path: |
+            playwright-report/
+            test-results/
+          retention-days: 14
+
+  test-summary:
+    name: Test Summary
+    runs-on: ubuntu-latest
+    needs: [smoke-tests, unit-tests, reconnection-tests, production-build-tests]
+    if: always()
+
+    steps:
+      - name: Download all test results
+        uses: actions/download-artifact@v4
+        with:
+          path: all-test-results
+
+      - name: Generate test summary
+        run: |
+          echo "## Test Suite Results" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          if [ -d "all-test-results" ]; then
+            echo "### Artifacts Generated" >> $GITHUB_STEP_SUMMARY
+            echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+            ls -R all-test-results >> $GITHUB_STEP_SUMMARY
+            echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+          fi
+
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Test Job Status" >> $GITHUB_STEP_SUMMARY
+          echo "- Smoke Tests: ${{ needs.smoke-tests.result }}" >> $GITHUB_STEP_SUMMARY
+          echo "- Unit Tests: ${{ needs.unit-tests.result }}" >> $GITHUB_STEP_SUMMARY
+          echo "- Reconnection Tests: ${{ needs.reconnection-tests.result }}" >> $GITHUB_STEP_SUMMARY
+          echo "- Production Build: ${{ needs.production-build-tests.result }}" >> $GITHUB_STEP_SUMMARY
