@@ -308,10 +308,115 @@
   margin: var(--spacing-md) 0;
 }
 
-.message-text.showing-raw {
+/* Styled Markdown Syntax (shows syntax with styling) */
+
+.styled-markdown .md-syntax {
+  color: var(--text-muted);
+  opacity: 0.5;
+}
+
+.styled-markdown .md-h1 {
+  display: block;
+  font-size: 1.8em;
+  font-weight: 700;
+  line-height: 1.3;
+  margin: var(--spacing-md) 0;
+  border-bottom: 2px solid var(--border-color);
+  padding-bottom: var(--spacing-sm);
+}
+
+.styled-markdown .md-h2 {
+  display: block;
+  font-size: 1.5em;
+  font-weight: 700;
+  line-height: 1.3;
+  margin: var(--spacing-md) 0;
+  border-bottom: 1px solid var(--border-color);
+  padding-bottom: var(--spacing-xs);
+}
+
+.styled-markdown .md-h3 {
+  display: block;
+  font-size: 1.3em;
+  font-weight: 700;
+  line-height: 1.3;
+  margin: var(--spacing-md) 0;
+}
+
+.styled-markdown .md-h4,
+.styled-markdown .md-h5,
+.styled-markdown .md-h6 {
+  display: block;
+  font-size: 1.1em;
+  font-weight: 700;
+  line-height: 1.3;
+  margin: var(--spacing-sm) 0;
+}
+
+.styled-markdown .md-bold-text {
+  font-weight: 700;
+}
+
+.styled-markdown .md-italic-text {
+  font-style: italic;
+}
+
+.styled-markdown .md-strikethrough-text {
+  text-decoration: line-through;
+}
+
+.styled-markdown .md-code {
+  background-color: rgba(var(--bg-tertiary-rgb, 30, 31, 34), 0.5);
+  border-radius: var(--radius-sm);
+  padding: 2px 4px;
+}
+
+.styled-markdown .md-code-text {
   font-family: 'Monaco', 'Menlo', 'Courier New', monospace;
   font-size: 0.9em;
+}
+
+.styled-markdown .md-link-text {
+  color: var(--text-link);
+  text-decoration: underline;
+}
+
+.styled-markdown .md-link-url {
+  color: var(--text-muted);
+  font-size: 0.9em;
+}
+
+.styled-markdown .md-list {
+  display: block;
+  margin-left: var(--spacing-md);
+}
+
+.styled-markdown .md-blockquote {
+  display: block;
+  padding-left: var(--spacing-md);
+  border-left: 4px solid var(--accent-primary);
+  margin: var(--spacing-sm) 0;
   color: var(--text-secondary);
+  font-style: italic;
+}
+
+.styled-markdown .md-codeblock {
+  display: block;
+  background-color: var(--bg-tertiary);
+  padding: var(--spacing-sm);
+  border-radius: var(--radius-sm);
+  margin: var(--spacing-sm) 0;
+}
+
+[data-theme="dark"] {
+  --bg-tertiary-rgb: 30, 31, 34;
+}
+
+[data-theme="light"] {
+  --bg-tertiary-rgb: 243, 244, 246;
+}
+
+.message-text.showing-raw {
   white-space: pre-wrap;
   word-break: break-word;
 }

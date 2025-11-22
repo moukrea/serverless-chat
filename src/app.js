@@ -5,7 +5,7 @@ globalThis.process = process;
 import Identity from './identity.js';
 import MeshNetwork from './mesh.js';
 import MarkdownInput from './components/markdown-input.js';
-import { renderMarkdown } from './utils/markdown-renderer.js';
+import { renderMarkdown, renderStyledMarkdown } from './utils/markdown-renderer.js';
 import './styles/main.css';
 import './styles/markdown.css';
 
@@ -434,7 +434,9 @@ function addMessage(text, type = 'sent', uuid = null, format = 'plain') {
   timestamp.className = 'message-timestamp';
   timestamp.textContent = formatTimestamp();
 
-  // Add toggle button for markdown messages
+  header.appendChild(authorSpan);
+  header.appendChild(timestamp);
+
   if (format === 'markdown') {
     const toggleBtn = document.createElement('button');
     toggleBtn.className = 'btn-toggle-raw';
@@ -444,9 +446,6 @@ function addMessage(text, type = 'sent', uuid = null, format = 'plain') {
     toggleBtn.addEventListener('click', () => toggleMessageView(messageGroup));
     header.appendChild(toggleBtn);
   }
-
-  header.appendChild(authorSpan);
-  header.appendChild(timestamp);
 
   // Create message text
   const textDiv = document.createElement('div');
@@ -488,13 +487,14 @@ function toggleMessageView(messageGroup) {
   if (isShowingRaw) {
     const renderedHtml = renderMarkdown(rawText);
     textDiv.innerHTML = renderedHtml;
-    textDiv.classList.remove('showing-raw');
+    textDiv.classList.remove('showing-raw', 'styled-markdown');
     textDiv.classList.add('markdown-rendered');
     toggleBtn.innerHTML = '<i class="ti ti-code"></i>';
     toggleBtn.setAttribute('title', 'View raw markdown');
   } else {
-    textDiv.textContent = rawText;
-    textDiv.classList.add('showing-raw');
+    const styledHtml = renderStyledMarkdown(rawText);
+    textDiv.innerHTML = styledHtml;
+    textDiv.classList.add('showing-raw', 'styled-markdown');
     textDiv.classList.remove('markdown-rendered');
     toggleBtn.innerHTML = '<i class="ti ti-eye"></i>';
     toggleBtn.setAttribute('title', 'View rendered markdown');
@@ -666,9 +666,17 @@ $('btnSend').onclick = () => {
 };
 
 $('messageInput').onkeypress = (e) => {
-  if (e.key === 'Enter' && !e.shiftKey) {
-    e.preventDefault();
-    $('btnSend').click();
+  const isMobile = window.innerWidth <= 768;
+
+  if (e.key === 'Enter') {
+    if (isMobile) {
+      return;
+    }
+
+    if (!e.shiftKey) {
+      e.preventDefault();
+      $('btnSend').click();
+    }
   }
 };
 
@@ -1259,7 +1267,6 @@ addMessage('Welcome! Your identity has been created.', 'system');
 // Initialize markdown input component
 try {
   markdownInput = new MarkdownInput('messageInput', {
-    mode: 'hybrid',
     debounceDelay: 300
   });
   console.log('[App] Markdown input initialized');

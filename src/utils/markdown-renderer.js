@@ -83,3 +83,47 @@ export function detectMarkdownSyntax(text) {
 
   return markdownPatterns.some(pattern => pattern.test(text));
 }
+
+function escapeHtml(text) {
+  const div = document.createElement('div');
+  div.textContent = text;
+  return div.innerHTML;
+}
+
+export function renderStyledMarkdown(text) {
+  if (typeof text !== 'string' || !text.trim()) {
+    return '';
+  }
+
+  const lines = text.split('\n');
+  const styledLines = lines.map(line => {
+    let styled = escapeHtml(line);
+
+    styled = styled.replace(/^(#{1,6})\s+(.+)$/g, (match, hashes, content) => {
+      const level = hashes.length;
+      return `<span class="md-h${level}"><span class="md-syntax">${hashes} </span><span class="md-h${level}-text">${content}</span></span>`;
+    });
+
+    styled = styled.replace(/\*\*([^*]+)\*\*/g, '<span class="md-bold"><span class="md-syntax">**</span><span class="md-bold-text">$1</span><span class="md-syntax">**</span></span>');
+
+    styled = styled.replace(/(?<!\*)\*([^*]+)\*(?!\*)/g, '<span class="md-italic"><span class="md-syntax">*</span><span class="md-italic-text">$1</span><span class="md-syntax">*</span></span>');
+
+    styled = styled.replace(/~~([^~]+)~~/g, '<span class="md-strikethrough"><span class="md-syntax">~~</span><span class="md-strikethrough-text">$1</span><span class="md-syntax">~~</span></span>');
+
+    styled = styled.replace(/`([^`]+)`/g, '<span class="md-code"><span class="md-syntax">`</span><span class="md-code-text">$1</span><span class="md-syntax">`</span></span>');
+
+    styled = styled.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<span class="md-link"><span class="md-syntax">[</span><span class="md-link-text">$1</span><span class="md-syntax">](</span><span class="md-link-url">$2</span><span class="md-syntax">)</span></span>');
+
+    styled = styled.replace(/^(\s*[-*+])\s+(.+)$/g, '<span class="md-list"><span class="md-syntax">$1 </span><span class="md-list-text">$2</span></span>');
+
+    styled = styled.replace(/^(\s*\d+\.)\s+(.+)$/g, '<span class="md-list"><span class="md-syntax">$1 </span><span class="md-list-text">$2</span></span>');
+
+    styled = styled.replace(/^(&gt;)\s+(.+)$/g, '<span class="md-blockquote"><span class="md-syntax">&gt; </span><span class="md-blockquote-text">$2</span></span>');
+
+    styled = styled.replace(/^(```)(.*)$/g, '<span class="md-codeblock"><span class="md-syntax">$1</span><span class="md-codeblock-lang">$2</span></span>');
+
+    return styled;
+  });
+
+  return styledLines.join('\n');
+}
