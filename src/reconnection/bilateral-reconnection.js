@@ -218,7 +218,7 @@ export class BilateralReconnectionManager {
    */
   async checkForIncomingOffers() {
     // Get all peers we know about
-    const allPeers = await this.peerPersistence.getAllPeers();
+    const allPeers = await this.peerPersistence.queryPeers({ limit: 100 });
 
     for (const peerInfo of allPeers) {
       const peerId = peerInfo.peerId;
@@ -380,7 +380,7 @@ export class BilateralReconnectionManager {
     }, BILATERAL_CONFIG.OFFER_INTERVAL);
 
     // Also start reconnecting to all disconnected peers
-    const allPeers = await this.peerPersistence.getAllPeers();
+    const allPeers = await this.peerPersistence.queryPeers({ limit: 100 });
     for (const peerInfo of allPeers) {
       if (!this.peerManager.peers.has(peerInfo.peerId)) {
         await this.startReconnecting(peerInfo.peerId);
