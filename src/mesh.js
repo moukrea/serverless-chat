@@ -7,6 +7,12 @@ import SecurityManager from './mesh-security.js';
 import ICE_CONFIG from './config/ice-config.js';
 import connectionDiagnostics from './diagnostics/connection-diagnostics.js';
 
+// Reconnection system imports
+import MasterReconnectionStrategy from './reconnection/master-reconnection.js';
+import { PeerPersistenceManager } from './storage/peer-persistence.js';
+import ReconnectionAuth from './reconnection-auth.js';
+import NetworkChangeDetector from './network/change-detector.js';
+
 // Multi-peer mesh network manager with automatic discovery and routing
 class MeshNetwork {
   constructor(identity) {
@@ -26,6 +32,10 @@ class MeshNetwork {
     this.connectionManager = new ConnectionManager(identity);
     this.securityManager = new SecurityManager();
 
+    // Initialize reconnection system
+    this.reconnectionEnabled = true;
+    this.initializeReconnectionSystem();
+
     // Wire up subsystems
     this.router.setPeerManager(this);
     this.introManager.setPeerManager(this);
@@ -42,7 +52,126 @@ class MeshNetwork {
     this.router.on('ping', (msg) => this.latencyManager.handlePing(msg));
     this.router.on('pong', (msg) => this.latencyManager.handlePong(msg));
 
+    // Register reconnection message handlers
+    if (this.reconnectionEnabled) {
+      this.registerReconnectionHandlers();
+    }
+
     console.log('[Mesh] Network initialized with routing subsystems');
+    if (this.reconnectionEnabled) {
+      console.log('[Mesh] Reconnection system enabled');
+    }
+  }
+
+  // Initialize reconnection system
+  async initializeReconnectionSystem() {
+    try {
+      console.log('[Mesh] Initializing reconnection system...');
+
+      // Initialize peer persistence
+      this.peerPersistence = new PeerPersistenceManager({
+        storagePrefix: 'mesh',
+        maxPeers: 100,
+        cleanupStrategy: 'hybrid'
+      });
+      await this.peerPersistence.initialize();
+
+      // Initialize reconnection authentication
+      this.reconnectionAuth = new ReconnectionAuth({
+        peerId: this.identity.uuid,
+        displayName: this.identity.displayName
+      });
+
+      // Initialize master reconnection strategy
+      this.masterReconnect = new MasterReconnectionStrategy(
+        this.identity,
+        this.router,
+        this, // peerManager (this)
+        this.peerPersistence,
+        this.reconnectionAuth
+      );
+
+      // Initialize network change detector
+      const reconnectorAdapter = {
+        handleIpChange: async () => {
+          return await this.masterReconnect.handleIpChange();
+        }
+      };
+
+      this.networkDetector = new NetworkChangeDetector(reconnectorAdapter);
+      this.networkDetector.initialize();
+
+      console.log('[Mesh] Reconnection system initialized successfully');
+
+      // Start periodic announcements
+      this.masterReconnect.announcements.startPeriodicAnnouncements(120000); // 2 minutes
+
+      return true;
+    } catch (error) {
+      console.error('[Mesh] Failed to initialize reconnection system:', error);
+      this.reconnectionEnabled = false;
+      return false;
+    }
+  }
+
+  // Register reconnection message handlers
+  registerReconnectionHandlers() {
+    // Announcement handlers
+    this.router.on('peer_announcement', (msg) => {
+      if (this.masterReconnect && this.masterReconnect.announcements) {
+        this.masterReconnect.announcements.handlePeerAnnouncement(msg);
+      }
+    });
+
+    this.router.on('ip_change_announcement', (msg) => {
+      if (this.masterReconnect && this.masterReconnect.announcements) {
+        this.masterReconnect.announcements.handleIpChange(msg);
+      }
+    });
+
+    // Relay reconnection handlers
+    this.router.on('reconnect_offer', (msg) => {
+      if (this.masterReconnect && this.masterReconnect.meshReconnect) {
+        this.masterReconnect.meshReconnect.handleReconnectOffer(msg);
+      }
+    });
+
+    this.router.on('reconnect_answer', (msg) => {
+      if (this.masterReconnect && this.masterReconnect.meshReconnect) {
+        this.masterReconnect.meshReconnect.handleReconnectAnswer(msg);
+      }
+    });
+
+    this.router.on('reconnect_rejection', (msg) => {
+      if (this.masterReconnect && this.masterReconnect.meshReconnect) {
+        this.masterReconnect.meshReconnect.handleReconnectRejection(msg);
+      }
+    });
+
+    this.router.on('path_query', (msg) => {
+      if (this.masterReconnect && this.masterReconnect.meshReconnect) {
+        this.masterReconnect.meshReconnect.handlePathQuery(msg);
+      }
+    });
+
+    this.router.on('path_response', (msg) => {
+      if (this.masterReconnect && this.masterReconnect.meshReconnect) {
+        this.masterReconnect.meshReconnect.handlePathResponse(msg);
+      }
+    });
+
+    // Topology discovery handlers (optional)
+    if (this.masterReconnect.topology) {
+      this.router.on('topology_request', (msg) => {
+        this.masterReconnect.topology.handleTopologyRequest(msg);
+      });
+
+      this.router.on('topology_response', (msg) => {
+        this.masterReconnect.topology.handleTopologyResponse(msg);
+      });
+    }
+
+    console.log('[Mesh] Reconnection message handlers registered');
   }
 
   // Create an offer to invite someone
@@ -279,7 +408,7 @@ class MeshNetwork {
   }
 
   _setupPeerHandlers(peer, knownUUID = null) {
-    peer.on('connect', () => {
+    peer.on('connect', async () => {
       const uuid = knownUUID || peer._peerUUID;
       if (uuid && this.peers.has(uuid)) {
         const peerData = this.peers.get(uuid);
@@ -308,6 +437,21 @@ class MeshNetwork {
         }
 
         this.peers.set(uuid, peerData);
+
+        // Store peer in persistence for reconnection
+        if (this.reconnectionEnabled && this.peerPersistence) {
+          await this.storePeerForReconnection(uuid, peerData, peer, diag);
+        }
+
+        // Exchange cryptographic identity
+        if (this.reconnectionEnabled && this.reconnectionAuth) {
+          try {
+            await this.reconnectionAuth.exchangeIdentity(peer, uuid);
+            console.log(`[Mesh] Identity exchanged with ${peerData.displayName}`);
+          } catch (error) {
+            console.warn('[Mesh] Failed to exchange identity:', error);
+          }
+        }
 
         if (this.onPeerConnect) {
           this.onPeerConnect(uuid, peerData.displayName);
@@ -343,11 +487,18 @@ class MeshNetwork {
       }
     });
 
-    peer.on('close', () => {
+    peer.on('close', async () => {
       const uuid = knownUUID || peer._peerUUID;
       if (uuid && this.peers.has(uuid)) {
         console.log(`[Mesh] Disconnected from ${uuid.substring(0, 8)}`);
+
+        // Update last seen in persistence
+        if (this.reconnectionEnabled && this.peerPersistence) {
+          await this.peerPersistence.updateLastSeen(uuid);
+        }
+
         this.peers.delete(uuid);
+
         if (this.onPeerDisconnect) {
           this.onPeerDisconnect(uuid);
         }
@@ -361,6 +512,11 @@ class MeshNetwork {
         const peerData = this.peers.get(uuid);
         peerData.status = 'error';
         this.peers.set(uuid, peerData);
+
+        // Increment reconnection attempts on error
+        if (this.reconnectionEnabled && this.peerPersistence) {
+          this.peerPersistence.incrementReconnectionAttempts(uuid);
+        }
       }
     });
 
@@ -440,15 +596,138 @@ class MeshNetwork {
       .filter(data => data.status === 'connected').length;
   }
 
+  // Store peer for reconnection
+  async storePeerForReconnection(uuid, peerData, peer, diagnostics) {
+    try {
+      const peerInfo = {
+        peerId: uuid,
+        userId: uuid,
+        displayName: peerData.displayName,
+        lastSeen: Date.now(),
+        lastConnected: Date.now(),
+
+        // Cryptographic keys
+        publicKey: this.identity.keys?.publicKey || null,
+
+        // Network information
+        lastKnownIP: null,
+        iceServers: ICE_CONFIG.iceServers,
+
+        // Connection quality
+        connectionQuality: {
+          latency: peerData.latency || null,
+          connectionType: peerData.connectionType || 'unknown',
+          lastMeasured: Date.now()
+        },
+
+        // Metadata
+        metadata: {
+          connectedAt: peerData.connectedAt,
+          diagnostics: diagnostics ? {
+            connectionTime: diagnostics.timing?.connectionTime,
+            protocol: diagnostics.protocol
+          } : null
+        }
+      };
+
+      await this.peerPersistence.storePeer(peerInfo);
+      console.log(`[Mesh] Stored ${peerData.displayName} for reconnection`);
+    } catch (error) {
+      console.error('[Mesh] Failed to store peer for reconnection:', error);
+    }
+  }
+
+  // Attempt to reconnect to all known peers
+  async reconnectToMesh() {
+    if (!this.reconnectionEnabled || !this.masterReconnect) {
+      console.warn('[Mesh] Reconnection system not enabled');
+      return { success: false, reason: 'not_enabled' };
+    }
+
+    console.log('[Mesh] Starting mesh reconnection...');
+
+    try {
+      const result = await this.masterReconnect.reconnectToMesh();
+      console.log(`[Mesh] Reconnection complete: ${result.peersConnected || 0} peers connected via ${result.method}`);
+      return result;
+    } catch (error) {
+      console.error('[Mesh] Reconnection failed:', error);
+      return { success: false, reason: 'exception', error };
+    }
+  }
+
+  // Announce presence to mesh
+  async announcePresence(reason = 'manual') {
+    if (!this.reconnectionEnabled || !this.masterReconnect) {
+      return false;
+    }
+
+    try {
+      await this.masterReconnect.announcements.announcePresence(reason);
+      return true;
+    } catch (error) {
+      console.error('[Mesh] Failed to announce presence:', error);
+      return false;
+    }
+  }
+
+  // Get reconnection system statistics
+  getReconnectionStats() {
+    if (!this.reconnectionEnabled || !this.masterReconnect) {
+      return null;
+    }
+
+    return {
+      master: this.masterReconnect.getStats(),
+      persistence: {
+        totalPeers: this.peerPersistence.getStats().totalPeers,
+        needsCleanup: this.peerPersistence.needsCleanup()
+      },
+      network: this.networkDetector ? this.networkDetector.getStats() : null
+    };
+  }
+
+  // Register a reconnected peer (called by reconnection managers)
+  async registerReconnectedPeer(peerId, peerName, peer) {
+    console.log(`[Mesh] Registering reconnected peer: ${peerName}`);
+
+    // Start diagnostics monitoring
+    connectionDiagnostics.startMonitoring(peerId, peer);
+
+    // Register peer
+    this.peers.set(peerId, {
+      peer,
+      displayName: peerName,
+      status: 'connecting',
+      latency: null,
+      connectedAt: Date.now(),
+      connectionType: null
+    });
+
+    this._setupPeerHandlers(peer, peerId);
+  }
+
+  // Get all connected peers (for topology)
+  getAllConnectedPeers() {
+    return this.peers;
+  }
+
   // Get mesh statistics
   getStats() {
-    return {
+    const baseStats = {
       peers: this.getConnectedPeerCount(),
       router: this.router.getStats(),
       latency: this.latencyManager.getStats(),
       connection: this.connectionManager.getConnectionStats(),
       security: this.securityManager.getStats()
     };
+
+    // Add reconnection stats if enabled
+    if (this.reconnectionEnabled) {
+      baseStats.reconnection = this.getReconnectionStats();
+    }
+
+    return baseStats;
   }
 
   // Disconnect all peers
@@ -460,6 +739,16 @@ class MeshNetwork {
     this.introManager.stop();
     this.latencyManager.stop();
     this.connectionManager.stop();
+
+    // Cleanup reconnection system
+    if (this.reconnectionEnabled) {
+      if (this.masterReconnect) {
+        this.masterReconnect.destroy();
+      }
+      if (this.networkDetector) {
+        this.networkDetector.destroy();
+      }
+    }
 
     // Destroy all peers
     for (const [uuid, data] of this.peers.entries()) {

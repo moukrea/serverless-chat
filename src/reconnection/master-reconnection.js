@@ -874,4 +874,3 @@ class MasterReconnectionStrategy {
 // =============================================================================
 
 export default MasterReconnectionStrategy;
-export { MASTER_RECONNECTION_CONFIG };

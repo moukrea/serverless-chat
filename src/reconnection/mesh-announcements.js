@@ -772,4 +772,3 @@ class MeshAnnouncementManager {
 // =============================================================================
 
 export default MeshAnnouncementManager;
-export { ANNOUNCEMENT_CONFIG };

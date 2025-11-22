@@ -1019,6 +1019,117 @@ class PWAInstallManager {
 }
 
 // ============================================
+// Automatic Reconnection
+// ============================================
+
+async function initializeReconnection() {
+  console.log('[App] Initializing automatic reconnection...');
+
+  try {
+    // Check if reconnection is enabled
+    if (!mesh.reconnectionEnabled) {
+      console.warn('[App] Reconnection system not available');
+      return;
+    }
+
+    // Small delay to let network stabilize
+    await new Promise(resolve => setTimeout(resolve, 1000));
+
+    // Attempt reconnection
+    const result = await mesh.reconnectToMesh();
+
+    if (result.method === 'fallback_required') {
+      // All automatic reconnection failed, show manual pairing UI
+      console.log('[App] Automatic reconnection failed, showing pairing UI');
+      addMessage('No saved connections found. Click "New Connection" to connect.', 'system');
+    } else if (result.peersConnected > 0) {
+      // Successfully reconnected
+      console.log(`[App] Reconnected to ${result.peersConnected} peer(s)`);
+      addMessage(`Reconnected to ${result.peersConnected} peer(s) automatically!`, 'system');
+
+      // Enable UI
+      $('messageInput').disabled = false;
+      $('btnSend').disabled = false;
+    } else {
+      // No peers to reconnect to
+      console.log('[App] No peers available for reconnection');
+      addMessage('No saved connections. Click "New Connection" to connect.', 'system');
+    }
+  } catch (error) {
+    console.error('[App] Reconnection failed:', error);
+    addMessage('Reconnection error. Click "New Connection" to connect manually.', 'system');
+  }
+}
+
+// Debug utilities
+window.showReconnectionStats = () => {
+  const stats = mesh.getReconnectionStats();
+  if (!stats) {
+    console.log('Reconnection system not enabled');
+    return;
+  }
+
+  console.log('='.repeat(50));
+  console.log('RECONNECTION SYSTEM STATISTICS');
+  console.log('='.repeat(50));
+
+  if (stats.master) {
+    console.log('\n📊 Master Strategy:');
+    console.log('  Total attempts:', stats.master.totalReconnectionAttempts);
+    console.log('  Successful:', stats.master.successfulReconnections);
+    console.log('  Failed:', stats.master.failedReconnections);
+    console.log('  Success rate:',
+      stats.master.totalReconnectionAttempts > 0
+        ? `${((stats.master.successfulReconnections / stats.master.totalReconnectionAttempts) * 100).toFixed(1)}%`
+        : 'N/A'
+    );
+  }
+
+  if (stats.persistence) {
+    console.log('\n💾 Persistence:');
+    console.log('  Total saved peers:', stats.persistence.totalPeers);
+    console.log('  Needs cleanup:', stats.persistence.needsCleanup);
+  }
+
+  if (stats.network) {
+    console.log('\n🌐 Network:');
+    console.log('  IP changes:', stats.network.ipChangeCount);
+    console.log('  Connection type:', stats.network.currentConnectionType);
+    console.log('  Online:', stats.network.isOnline);
+  }
+
+  console.log('\n' + '='.repeat(50));
+};
+
+async function showSavedPeers() {
+  if (!mesh.peerPersistence) {
+    console.log('Peer persistence not available');
+    return;
+  }
+
+  const candidates = await mesh.peerPersistence.getReconnectionCandidates({
+    limit: 20,
+    maxAge: 7 * 24 * 60 * 60 * 1000 // Last 7 days
+  });
+
+  if (candidates.length === 0) {
+    console.log('No saved peers found');
+    return;
+  }
+
+  console.log(`📋 Saved Peers (${candidates.length}):`);
+  for (const candidate of candidates.slice(0, 10)) {
+    const peer = candidate.peer;
+    const lastSeen = new Date(peer.lastSeen).toLocaleString();
+    const status = mesh.peers.has(peer.peerId) ? '🟢 Connected' : '⚪ Disconnected';
+    console.log(`${status} ${peer.displayName} (score: ${candidate.score})`);
+    console.log(`   Last seen: ${lastSeen}`);
+  }
+}
+
+window.showSavedPeers = showSavedPeers;
+
+// ============================================
 // Initialization
 // ============================================
 
@@ -1034,4 +1145,8 @@ $('btnSend').disabled = true;
 
 // Welcome message
 addMessage('Welcome! Your identity has been created.', 'system');
-addMessage('Click "New Connection" to connect to peers.', 'system');
+
+// Start automatic reconnection
+window.addEventListener('DOMContentLoaded', () => {
+  initializeReconnection();
+});
