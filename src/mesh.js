@@ -12,6 +12,7 @@ import MasterReconnectionStrategy from './reconnection/master-reconnection.js';
 import { PeerPersistenceManager } from './storage/peer-persistence.js';
 import ReconnectionAuth from './reconnection-auth.js';
 import NetworkChangeDetector from './network/change-detector.js';
+import BilateralReconnectionManager from './reconnection/bilateral-reconnection.js';
 
 // Multi-peer mesh network manager with automatic discovery and routing
 class MeshNetwork {
@@ -80,6 +81,14 @@ class MeshNetwork {
       });
       await this.reconnectionAuth.initialize();
 
+      // Initialize bilateral reconnection manager
+      this.bilateralReconnect = new BilateralReconnectionManager(
+        this.identity,
+        this, // peerManager
+        this.peerPersistence
+      );
+      console.log('[Mesh] Bilateral reconnection manager initialized');
+
       // Initialize master reconnection strategy
       this.masterReconnect = new MasterReconnectionStrategy(
         this.identity,
@@ -110,6 +119,10 @@ class MeshNetwork {
 
       // Start periodic announcements
       this.masterReconnect.announcements.startPeriodicAnnouncements(120000); // 2 minutes
+
+      // Start bilateral reconnection monitoring
+      await this.bilateralReconnect.startMonitoring();
+      console.log('[Mesh] Bilateral reconnection monitoring started');
 
       return true;
     } catch (error) {
@@ -542,6 +555,12 @@ class MeshNetwork {
 
         this.peers.delete(uuid);
 
+        // Start bilateral reconnection attempt
+        if (this.reconnectionEnabled && this.bilateralReconnect) {
+          console.log(`[Mesh] Starting bilateral reconnection for ${uuid.substring(0, 8)}`);
+          await this.bilateralReconnect.startReconnecting(uuid);
+        }
+
         if (this.onPeerDisconnect) {
           this.onPeerDisconnect(uuid);
         }
@@ -832,6 +851,9 @@ class MeshNetwork {
 
     // Cleanup reconnection system
     if (this.reconnectionEnabled) {
+      if (this.bilateralReconnect) {
+        this.bilateralReconnect.destroy();
+      }
       if (this.masterReconnect) {
         this.masterReconnect.destroy();
       }
