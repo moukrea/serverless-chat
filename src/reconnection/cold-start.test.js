@@ -347,16 +347,14 @@ describe('ColdStartManager', () => {
   // ===========================================================================
 
   describe('Layer 4: Initial Pairing Fallback', () => {
-    test('should check for saved passphrase', () => {
-      // Mock localStorage
-      global.localStorage = {
-        getItem: jest.fn(() => 'test-passphrase')
+    test('should handle fallback gracefully', () => {
+      // Mock window for event dispatching
+      global.window = {
+        dispatchEvent: jest.fn()
       };
 
-      const passphrase = coldStart.getSavedPassphrase();
-
-      expect(passphrase).toBe('test-passphrase');
-      expect(localStorage.getItem).toHaveBeenCalledWith('mesh:dht:passphrase');
+      // Should not throw
+      expect(() => coldStart.showManualPairingUI()).not.toThrow();
     });
 
     test('should dispatch UI event when all layers fail', async () => {

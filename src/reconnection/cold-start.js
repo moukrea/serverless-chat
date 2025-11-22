@@ -95,7 +95,7 @@ const COLD_START_CONFIG = {
 
   // Layer 4: Fallback Settings
   FALLBACK: {
-    CHECK_SAVED_PASSPHRASE: true,      // Check for DHT passphrase
+    CHECK_SAVED_PASSPHRASE: false,     // Disabled
     SHOW_PAIRING_UI: true,             // Show manual pairing UI
   },
 
@@ -616,29 +616,7 @@ class ColdStartManager {
     console.log('[ColdStart] All automatic recovery methods failed');
     console.log('[ColdStart] ========================================');
 
-    // Check for saved passphrase (DHT fallback)
-    if (COLD_START_CONFIG.FALLBACK.CHECK_SAVED_PASSPHRASE) {
-      const savedPassphrase = this.getSavedPassphrase();
-
-      if (savedPassphrase) {
-        console.log('[ColdStart] Found saved passphrase, attempting DHT discovery...');
-
-        // If DHT is available (optional feature), try it
-        if (typeof window !== 'undefined' && window.dht) {
-          try {
-            await window.dht.join(savedPassphrase);
-            console.log('[ColdStart] ✓ DHT fallback successful');
-            return { success: true, method: 'dht_fallback' };
-          } catch (error) {
-            console.error('[ColdStart] DHT fallback failed:', error);
-          }
-        } else {
-          console.log('[ColdStart] DHT not available');
-        }
-      } else {
-        console.log('[ColdStart] No saved passphrase found');
-      }
-    }
+    // Reserved for future fallback mechanisms
 
     // Show UI for manual intervention
     if (COLD_START_CONFIG.FALLBACK.SHOW_PAIRING_UI) {
@@ -674,23 +652,6 @@ class ColdStartManager {
     window.dispatchEvent(event);
   }
 
-  /**
-   * Check for saved passphrase for DHT fallback (if DHT available)
-   * @returns {string|null} Saved passphrase or null
-   */
-  getSavedPassphrase() {
-    if (typeof localStorage === 'undefined') {
-      return null;
-    }
-
-    try {
-      const saved = localStorage.getItem('mesh:dht:passphrase');
-      return saved ? saved : null;
-    } catch (error) {
-      console.error('[ColdStart] Error reading saved passphrase:', error);
-      return null;
-    }
-  }
 
   // ===========================================================================
   // PEER SELECTION & SCORING
