@@ -420,29 +420,6 @@ class MeshNetwork {
   }
 
   _setupPeerHandlers(peer, knownUUID = null) {
-    // Monitor ICE connection state for early disconnection detection
-    // Use addEventListener to avoid interfering with SimplePeer's internal handlers
-    // Defer setup until after SimplePeer initialization is complete
-    peer.once('connect', () => {
-      if (peer._pc) {
-        peer._pc.addEventListener('iceconnectionstatechange', () => {
-          const uuid = knownUUID || peer._peerUUID;
-          const iceState = peer._pc.iceConnectionState;
-
-          if (uuid && iceState === 'disconnected') {
-            // Connection interrupted, trigger immediate reconnection attempt
-            if (this.reconnectionEnabled && this.masterReconnect) {
-              setTimeout(() => {
-                if (peer._pc && peer._pc.iceConnectionState === 'disconnected') {
-                  this.masterReconnect.handlePeerDisconnected(uuid);
-                }
-              }, 3000); // Wait 3s to see if connection recovers
-            }
-          }
-        });
-      }
-    });
-
     peer.on('connect', async () => {
       const uuid = knownUUID || peer._peerUUID;
       if (uuid && this.peers.has(uuid)) {
@@ -451,6 +428,22 @@ class MeshNetwork {
         peerData.connectedAt = Date.now();
 
         this.peers.set(uuid, peerData);
+
+        // Set up ICE connection state monitoring for disconnection detection
+        if (peer._pc && this.reconnectionEnabled && this.masterReconnect) {
+          peer._pc.addEventListener('iceconnectionstatechange', () => {
+            const iceState = peer._pc.iceConnectionState;
+
+            if (iceState === 'disconnected') {
+              // Connection interrupted, trigger immediate reconnection attempt
+              setTimeout(() => {
+                if (peer._pc && peer._pc.iceConnectionState === 'disconnected') {
+                  this.masterReconnect.handlePeerDisconnected(uuid);
+                }
+              }, 3000); // Wait 3s to see if connection recovers
+            }
+          });
+        }
 
         // Store peer in persistence for reconnection
         if (this.reconnectionEnabled && this.peerPersistence) {
