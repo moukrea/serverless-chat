@@ -5,7 +5,6 @@ import LatencyManager from './mesh-latency.js';
 import ConnectionManager from './mesh-connection.js';
 import SecurityManager from './mesh-security.js';
 import ICE_CONFIG from './config/ice-config.js';
-import connectionDiagnostics from './diagnostics/connection-diagnostics.js';
 
 // Reconnection system imports
 import MasterReconnectionStrategy from './reconnection/master-reconnection.js';
@@ -53,9 +52,7 @@ class MeshNetwork {
     this.router.on('ping', (msg) => this.latencyManager.handlePing(msg));
     this.router.on('pong', (msg) => this.latencyManager.handlePong(msg));
 
-    console.log('[Mesh] Network initialized with routing subsystems');
     if (this.reconnectionEnabled) {
-      console.log('[Mesh] Reconnection system enabled');
     }
   }
 
@@ -63,8 +60,6 @@ class MeshNetwork {
   async initializeReconnectionSystem() {
     const startTime = Date.now();
     try {
-      console.log('[Mesh] Initializing reconnection system...');
-
       // Initialize peer persistence
       this.peerPersistence = new PeerPersistenceManager({
         storagePrefix: 'mesh',
@@ -101,9 +96,6 @@ class MeshNetwork {
 
       // Register reconnection message handlers now that everything is initialized
       this.registerReconnectionHandlers();
-
-      const initTime = Date.now() - startTime;
-      console.log(`[Mesh] Reconnection system initialized successfully in ${initTime}ms`);
 
       // Mark as ready
       this.reconnectionReady = true;
@@ -195,8 +187,6 @@ class MeshNetwork {
             msg.senderId
           );
           if (result.valid) {
-            console.log(`[Mesh] Identity exchange completed with ${msg.senderId.substring(0, 8)}`);
-
             // Update stored peer with public key and shared secret
             if (this.peerPersistence) {
               const trustedPeer = this.reconnectionAuth.trustStore?.getPeer(msg.senderId);
@@ -217,7 +207,6 @@ class MeshNetwork {
       }
     });
 
-    console.log('[Mesh] Reconnection message handlers registered');
   }
 
   // Create an offer to invite someone
@@ -239,11 +228,6 @@ class MeshNetwork {
         resolve(encoded);
       });
 
-      // Start diagnostics monitoring
-      const tempId = `temp-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-      connectionDiagnostics.startMonitoring(tempId, peer);
-      peer._diagnosticsId = tempId;
-
       // Store peer temporarily until we get their identity
       peer._tempPeer = true;
       this._setupPeerHandlers(peer);
@@ -259,7 +243,6 @@ class MeshNetwork {
 
         // Check if banned
         if (this.securityManager.isBanned(uuid)) {
-          console.warn(`[Mesh] Peer ${uuid.substring(0, 8)} is banned`);
           reject(new Error('Peer is banned'));
           return;
         }
@@ -279,9 +262,6 @@ class MeshNetwork {
           const encoded = btoa(JSON.stringify(answerData));
           resolve(encoded);
         });
-
-        // Start diagnostics monitoring
-        connectionDiagnostics.startMonitoring(uuid, peer);
 
         // Register this peer
         this.peers.set(uuid, {
@@ -309,7 +289,6 @@ class MeshNetwork {
 
       // Check if banned
       if (this.securityManager.isBanned(uuid)) {
-        console.warn(`[Mesh] Peer ${uuid.substring(0, 8)} is banned`);
         throw new Error('Peer is banned');
       }
 
@@ -357,11 +336,8 @@ class MeshNetwork {
   // Create connection through introduction
   async createIntroducedConnection(peerId, peerName, introId) {
     if (this.peers.has(peerId)) {
-      console.log(`[Mesh] Already connected to ${peerId.substring(0, 8)}`);
       return false;
     }
-
-    console.log(`[Mesh] Creating introduced connection to ${peerName}...`);
 
     const peer = new SimplePeer({
       initiator: true,
@@ -383,9 +359,6 @@ class MeshNetwork {
       this.router.routeMessage(relayMessage);
     });
 
-    // Start diagnostics monitoring
-    connectionDiagnostics.startMonitoring(peerId, peer);
-
     // Register peer
     this.peers.set(peerId, {
       peer,
@@ -403,8 +376,6 @@ class MeshNetwork {
 
   // Handle relayed signal
   async handleRelayedSignal(fromPeerId, fromName, signal, signalType, introId) {
-    console.log(`[Mesh] Handling relayed ${signalType} from ${fromName}`);
-
     if (signalType === 'offer') {
       // Create answer
       const peer = new SimplePeer({
@@ -426,9 +397,6 @@ class MeshNetwork {
         this.router.routeMessage(relayMessage);
       });
 
-      // Start diagnostics monitoring
-      connectionDiagnostics.startMonitoring(fromPeerId, peer);
-
       // Register peer
       this.peers.set(fromPeerId, {
         peer,
@@ -447,8 +415,6 @@ class MeshNetwork {
       const peerData = this.peers.get(fromPeerId);
       if (peerData && peerData.peer) {
         peerData.peer.signal(signal);
-      } else {
-        console.warn(`[Mesh] No peer found for answer from ${fromPeerId.substring(0, 8)}`);
       }
     }
   }
@@ -461,39 +427,17 @@ class MeshNetwork {
         peerData.status = 'connected';
         peerData.connectedAt = Date.now();
 
-        // Transfer diagnostics data from temp ID to actual UUID
-        if (peer._diagnosticsId && peer._diagnosticsId !== uuid) {
-          const tempDiag = connectionDiagnostics.getDiagnostics(peer._diagnosticsId);
-          if (tempDiag) {
-            connectionDiagnostics.connections.set(uuid, tempDiag);
-            connectionDiagnostics.connections.delete(peer._diagnosticsId);
-            tempDiag.peerId = uuid;
-          }
-        }
-
-        // Update connection type from diagnostics
-        const diag = connectionDiagnostics.getDiagnostics(uuid);
-        if (diag && diag.connectionType) {
-          peerData.connectionType = diag.connectionType.name;
-          console.log(
-            `[Mesh] ${peerData.displayName} (${uuid.substring(0, 8)}) connected via ${diag.connectionType.name} (${diag.protocol})`
-          );
-        } else {
-          console.log(`[Mesh] Connected to ${peerData.displayName} (${uuid.substring(0, 8)})`);
-        }
-
         this.peers.set(uuid, peerData);
 
         // Store peer in persistence for reconnection
         if (this.reconnectionEnabled && this.peerPersistence) {
-          await this.storePeerForReconnection(uuid, peerData, peer, diag);
+          await this.storePeerForReconnection(uuid, peerData, peer);
         }
 
         // Exchange cryptographic identity
         if (this.reconnectionEnabled && this.reconnectionAuth) {
           try {
             await this.reconnectionAuth.exchangeIdentity(peer, uuid);
-            console.log(`[Mesh] Identity exchanged with ${peerData.displayName}`);
 
             // Update stored peer with public key from trust store
             const trustedPeer = this.reconnectionAuth.trustStore?.getPeer(uuid);
@@ -504,7 +448,6 @@ class MeshNetwork {
             // Exchange reconnection credentials
             await this.exchangeReconnectionCredentials(peer, uuid);
           } catch (error) {
-            console.warn('[Mesh] Failed to exchange identity:', error);
           }
         }
 
@@ -526,12 +469,10 @@ class MeshNetwork {
 
         // Security checks
         if (!this.securityManager.validateMessageStructure(message)) {
-          console.warn(`[Mesh] Invalid message from ${uuid?.substring(0, 8)}`);
           return;
         }
 
         if (uuid && !this.securityManager.checkRateLimit(uuid)) {
-          console.warn(`[Mesh] Rate limit exceeded for ${uuid.substring(0, 8)}`);
           return;
         }
 
@@ -545,8 +486,6 @@ class MeshNetwork {
     peer.on('close', async () => {
       const uuid = knownUUID || peer._peerUUID;
       if (uuid && this.peers.has(uuid)) {
-        console.log(`[Mesh] Disconnected from ${uuid.substring(0, 8)}`);
-
         // Update last seen in persistence
         if (this.reconnectionEnabled && this.peerPersistence) {
           await this.peerPersistence.updateLastSeen(uuid);
@@ -657,8 +596,6 @@ class MeshNetwork {
   // Exchange reconnection credentials with peer
   async exchangeReconnectionCredentials(peer, uuid) {
     try {
-      console.log(`[Mesh] Exchanging reconnection credentials with ${uuid.substring(0, 8)}`);
-
       // Create a new SimplePeer instance to generate fresh reconnection credentials
       const reconnectPeer = new SimplePeer({
         initiator: true,
@@ -697,8 +634,6 @@ class MeshNetwork {
         this.pendingReconnectionOffers = new Map();
       }
       this.pendingReconnectionOffers.set(uuid, { offer, timestamp: Date.now() });
-
-      console.log(`[Mesh] Sent reconnection offer to ${uuid.substring(0, 8)}`);
     } catch (error) {
       console.error(`[Mesh] Failed to exchange reconnection credentials with ${uuid.substring(0, 8)}:`, error);
     }
@@ -709,8 +644,6 @@ class MeshNetwork {
     try {
       const { offer } = msg.payload;
       const fromPeerId = msg.senderId;
-
-      console.log(`[Mesh] Received reconnection offer from ${fromPeerId.substring(0, 8)}`);
 
       // Create a new SimplePeer instance as responder
       const reconnectPeer = new SimplePeer({
@@ -758,8 +691,6 @@ class MeshNetwork {
       await this.peerPersistence.updatePeer(fromPeerId, {
         reconnectionCredentials: reconnectionCreds
       });
-
-      console.log(`[Mesh] Sent reconnection answer to ${fromPeerId.substring(0, 8)}`);
     } catch (error) {
       console.error(`[Mesh] Failed to handle reconnection offer from ${msg.senderId.substring(0, 8)}:`, error);
     }
@@ -771,12 +702,9 @@ class MeshNetwork {
       const { answer } = msg.payload;
       const fromPeerId = msg.senderId;
 
-      console.log(`[Mesh] Received reconnection answer from ${fromPeerId.substring(0, 8)}`);
-
       // Get our pending offer
       const pending = this.pendingReconnectionOffers?.get(fromPeerId);
       if (!pending) {
-        console.warn(`[Mesh] No pending reconnection offer for ${fromPeerId.substring(0, 8)}`);
         return;
       }
 
@@ -793,25 +721,16 @@ class MeshNetwork {
 
       // Clean up pending offer
       this.pendingReconnectionOffers.delete(fromPeerId);
-
-      console.log(`[Mesh] Stored reconnection credentials for ${fromPeerId.substring(0, 8)}`);
     } catch (error) {
       console.error(`[Mesh] Failed to handle reconnection answer from ${msg.senderId.substring(0, 8)}:`, error);
     }
   }
 
   // Store peer for reconnection
-  async storePeerForReconnection(uuid, peerData, peer, diagnostics) {
+  async storePeerForReconnection(uuid, peerData, peer) {
     try {
-      // Extract ICE candidates from diagnostics
+      // Extract ICE candidates from peer connection
       const cachedCandidates = [];
-      if (diagnostics && diagnostics.candidates) {
-        ['host', 'srflx', 'relay', 'prflx'].forEach(type => {
-          if (diagnostics.candidates[type]) {
-            cachedCandidates.push(...diagnostics.candidates[type].map(c => ({ ...c, category: type })));
-          }
-        });
-      }
 
       // Extract SDP offer/answer from WebRTC connection
       let lastOffer = null;
@@ -859,16 +778,11 @@ class MeshNetwork {
 
         // Metadata
         metadata: {
-          connectedAt: peerData.connectedAt,
-          diagnostics: diagnostics ? {
-            connectionTime: diagnostics.timing?.connectionTime,
-            protocol: diagnostics.protocol
-          } : null
+          connectedAt: peerData.connectedAt
         }
       };
 
       await this.peerPersistence.storePeer(peerInfo);
-      console.log(`[Mesh] Stored ${peerData.displayName} for reconnection (${cachedCandidates.length} ICE candidates)`);
     } catch (error) {
       console.error('[Mesh] Failed to store peer for reconnection:', error);
     }
@@ -878,12 +792,10 @@ class MeshNetwork {
   async reconnectToMesh() {
     // Wait for initialization if still pending
     if (!this.reconnectionReady && this._initPromise) {
-      console.log('[Mesh] Waiting for reconnection system initialization...');
       await this._initPromise;
     }
 
     if (!this.reconnectionEnabled) {
-      console.warn('[Mesh] Reconnection system disabled (initialization failed)');
       return { success: false, reason: 'disabled' };
     }
 
@@ -892,11 +804,8 @@ class MeshNetwork {
       return { success: false, reason: 'not_initialized' };
     }
 
-    console.log('[Mesh] Starting mesh reconnection...');
-
     try {
       const result = await this.masterReconnect.reconnectToMesh();
-      console.log(`[Mesh] Reconnection complete: ${result.peersConnected || 0} peers connected via ${result.method}`);
       return result;
     } catch (error) {
       console.error('[Mesh] Reconnection failed:', error);
@@ -937,11 +846,6 @@ class MeshNetwork {
 
   // Register a reconnected peer (called by reconnection managers)
   async registerReconnectedPeer(peerId, peerName, peer) {
-    console.log(`[Mesh] Registering reconnected peer: ${peerName}`);
-
-    // Start diagnostics monitoring
-    connectionDiagnostics.startMonitoring(peerId, peer);
-
     // Register peer
     this.peers.set(peerId, {
       peer,
@@ -980,8 +884,6 @@ class MeshNetwork {
 
   // Disconnect all peers
   destroy() {
-    console.log('[Mesh] Shutting down network');
-
     // Stop subsystems
     this.router.stop();
     this.introManager.stop();

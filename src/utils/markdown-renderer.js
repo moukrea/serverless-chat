@@ -50,20 +50,6 @@ export function renderMarkdown(text, options = {}) {
   }
 }
 
-export function validateMarkdownInput(text) {
-  if (typeof text !== 'string') {
-    return '';
-  }
-
-  const trimmed = text.trim().substring(0, 5000);
-
-  if (/<script|javascript:/i.test(trimmed)) {
-    throw new Error('Invalid content detected');
-  }
-
-  return trimmed;
-}
-
 export function detectMarkdownSyntax(text) {
   if (typeof text !== 'string' || !text.trim()) {
     return false;

@@ -80,8 +80,6 @@ class DirectReconnectionManager {
 
     // Track active monitoring
     this.monitoredPeers = new Map(); // peerId -> monitoring data
-
-    console.log('[DirectReconnection] Initialized');
   }
 
   // ===========================================================================
@@ -110,14 +108,11 @@ class DirectReconnectionManager {
   async attemptDirectReconnection(peerId, timeout = RECONNECTION_CONFIG.DEFAULT_TIMEOUT) {
     const startTime = Date.now();
 
-    console.log(`[DirectReconnection] Attempting reconnection to ${peerId.substring(0, 8)}...`);
-
     try {
       // 1. Retrieve cached peer data
       const cached = await this.peerPersistence.getPeer(peerId);
 
       if (!cached) {
-        console.log(`[DirectReconnection] No cached data for ${peerId.substring(0, 8)}`);
         return {
           success: false,
           reason: 'no_cached_data',
@@ -128,7 +123,6 @@ class DirectReconnectionManager {
       // 2. Validate cache freshness
       if (!this.isCacheValid(cached)) {
         const age = Date.now() - cached.lastSeen;
-        console.log(`[DirectReconnection] Cache too old: ${Math.floor(age / 1000)}s (${cached.connectionQuality?.connectionType || 'unknown'})`);
 
         return {
           success: false,
@@ -140,11 +134,9 @@ class DirectReconnectionManager {
 
       // 3. Check reconnection probability
       const probability = this.getReconnectionProbability(cached);
-      console.log(`[DirectReconnection] Probability: ${probability.likelihood} (${probability.score}% - ${probability.factors.join(', ')})`);
 
       // 4. Try reusing last signaling data (rarely works but fastest if it does)
       if (cached.lastOffer && cached.lastAnswer) {
-        console.log(`[DirectReconnection] Attempting offer/answer reuse...`);
         const signalingResult = await this.tryReuseSignaling(cached, timeout);
 
         if (signalingResult.success) {
@@ -152,20 +144,16 @@ class DirectReconnectionManager {
             lastMeasured: Date.now()
           });
 
-          console.log(`[DirectReconnection] ✓ Reconnected via signaling reuse in ${Date.now() - startTime}ms`);
           return {
             success: true,
             method: 'signaling_reuse',
             duration: Date.now() - startTime
           };
         }
-
-        console.log(`[DirectReconnection] Signaling reuse failed: ${signalingResult.reason}`);
       }
 
       // 5. Try using pre-exchanged reconnection credentials
       if (cached.reconnectionCredentials) {
-        console.log(`[DirectReconnection] Attempting reconnection with pre-exchanged credentials...`);
         const credentialsResult = await this.tryReconnectionCredentials(cached, timeout);
 
         if (credentialsResult.success) {
@@ -173,15 +161,12 @@ class DirectReconnectionManager {
             lastMeasured: Date.now()
           });
 
-          console.log(`[DirectReconnection] ✓ Reconnected via pre-exchanged credentials in ${Date.now() - startTime}ms`);
           return {
             success: true,
             method: 'pre_exchanged_credentials',
             duration: Date.now() - startTime
           };
         }
-
-        console.log(`[DirectReconnection] Pre-exchanged credentials failed: ${credentialsResult.reason}`);
       }
 
       // 6. Update failure counter
@@ -254,13 +239,7 @@ class DirectReconnectionManager {
       }
     }
 
-    const isValid = age <= maxAge;
-
-    if (!isValid) {
-      console.log(`[DirectReconnection] Cache invalid: age=${Math.floor(age/1000)}s, max=${Math.floor(maxAge/1000)}s, type=${connectionType || 'unknown'}`);
-    }
-
-    return isValid;
+    return age <= maxAge;
   }
 
   /**
@@ -322,7 +301,6 @@ class DirectReconnectionManager {
 
         // Handle successful connection
         peer.on('connect', () => {
-          console.log('[DirectReconnection] Signaling reuse successful!');
           finish({
             success: true,
             reason: 'connected',
@@ -332,7 +310,6 @@ class DirectReconnectionManager {
 
         // Handle errors
         peer.on('error', (err) => {
-          console.log(`[DirectReconnection] Signaling reuse error: ${err.message}`);
           finish({
             success: false,
             reason: 'peer_error',
@@ -429,8 +406,6 @@ class DirectReconnectionManager {
           return;
         }
 
-        console.log(`[DirectReconnection] Using pre-exchanged credentials as ${initiator ? 'initiator' : 'responder'}`);
-
         peer = new SimplePeer({
           initiator,
           trickle: false,
@@ -447,8 +422,6 @@ class DirectReconnectionManager {
 
         // Handle successful connection
         peer.on('connect', async () => {
-          console.log('[DirectReconnection] Pre-exchanged credentials successful!');
-
           // Register peer with mesh
           if (this.peerManager.registerReconnectedPeer) {
             await this.peerManager.registerReconnectedPeer(
@@ -467,7 +440,6 @@ class DirectReconnectionManager {
 
         // Handle errors
         peer.on('error', (err) => {
-          console.log(`[DirectReconnection] Credentials error: ${err.message}`);
           finish({
             success: false,
             reason: 'peer_error',
@@ -521,11 +493,8 @@ class DirectReconnectionManager {
    */
   monitorPeerConnection(peerId, peerName, peer) {
     if (!peer || !peer._pc) {
-      console.warn(`[DirectReconnection] Cannot monitor peer ${peerId.substring(0, 8)}: invalid peer object`);
       return;
     }
-
-    console.log(`[DirectReconnection] Monitoring peer ${peerId.substring(0, 8)} for caching`);
 
     const monitoring = {
       peerId,
@@ -550,8 +519,8 @@ class DirectReconnectionManager {
       this.handlePeerDisconnect(peerId);
     });
 
-    peer.on('error', (err) => {
-      console.log(`[DirectReconnection] Monitored peer ${peerId.substring(0, 8)} error: ${err.message}`);
+    peer.on('error', () => {
+      // Error handled elsewhere
     });
   }
 
@@ -565,7 +534,6 @@ class DirectReconnectionManager {
       const pc = peer._pc;
 
       if (!pc) {
-        console.warn(`[DirectReconnection] No RTCPeerConnection for ${peerId.substring(0, 8)}`);
         return;
       }
 
@@ -624,8 +592,6 @@ class DirectReconnectionManager {
             wasInitiator: peer.initiator,
           });
 
-          console.log(`[DirectReconnection] Cached connection data for ${peerId.substring(0, 8)} (${connectionInfo.connectionType?.name || 'unknown'})`);
-
         } catch (error) {
           console.error(`[DirectReconnection] Error capturing stats:`, error);
         }
@@ -644,8 +610,6 @@ class DirectReconnectionManager {
     const monitoring = this.monitoredPeers.get(peerId);
 
     if (!monitoring) return;
-
-    console.log(`[DirectReconnection] Peer ${peerId.substring(0, 8)} disconnected after ${Math.floor((Date.now() - monitoring.startTime) / 1000)}s`);
 
     // Update last seen timestamp
     await this.peerPersistence.updateLastSeen(peerId);
@@ -728,8 +692,6 @@ class DirectReconnectionManager {
 
       // Store updated peer data
       await this.peerPersistence.storePeer(peer);
-
-      console.log(`[DirectReconnection] Cached connection info for ${peerId.substring(0, 8)}`);
 
     } catch (error) {
       console.error(`[DirectReconnection] Error caching connection info:`, error);
@@ -893,7 +855,6 @@ class DirectReconnectionManager {
    * Stop monitoring all peers
    */
   stopMonitoring() {
-    console.log(`[DirectReconnection] Stopping monitoring for ${this.monitoredPeers.size} peers`);
     this.monitoredPeers.clear();
   }
 

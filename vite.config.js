@@ -13,7 +13,6 @@ export default defineConfig({
   },
   resolve: {
     alias: {
-      events: 'events',
       process: 'process/browser',
     },
   },

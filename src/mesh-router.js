@@ -88,7 +88,6 @@ class MessageRouter {
 
     // Validate message structure
     if (!this.validateMessage(message)) {
-      console.warn('[Router] Invalid message structure:', message);
       return false;
     }
 
@@ -115,7 +114,6 @@ class MessageRouter {
 
     // Check for loops
     if (this.hasLoop(message.path)) {
-      console.warn('[Router] Loop detected in path:', message.path);
       return false;
     }
 
@@ -219,7 +217,6 @@ class MessageRouter {
 
   async forwardMessage(message, excludePeerId) {
     if (!this.peerManager) {
-      console.warn('[Router] No peer manager set');
       return 0;
     }
 
@@ -265,10 +262,6 @@ class MessageRouter {
       }
     }
 
-    if (forwardCount > 0) {
-      console.log(`[Router] Forwarded message ${message.msgId} to ${forwardCount} peers`);
-    }
-
     return forwardCount;
   }
 
@@ -281,8 +274,6 @@ class MessageRouter {
       } catch (e) {
         console.error(`[Router] Handler error for ${message.msgType}:`, e);
       }
-    } else {
-      console.warn(`[Router] No handler for message type: ${message.msgType}`);
     }
   }
 
@@ -303,10 +294,6 @@ class MessageRouter {
         this.seenMessages.delete(msgId);
         cleaned++;
       }
-    }
-
-    if (cleaned > 0) {
-      console.log(`[Router] Cleaned ${cleaned} old messages from cache`);
     }
   }
 

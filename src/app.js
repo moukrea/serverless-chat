@@ -1,7 +1,3 @@
-import process from 'process';
-window.process = process;
-globalThis.process = process;
-
 import Identity from './identity.js';
 import MeshNetwork from './mesh.js';
 import MarkdownInput from './components/markdown-input.js';
@@ -521,12 +517,9 @@ $('btnNewConnection').onclick = () => {
 $('btnClearData').onclick = () => {
   if (confirm('Are you sure you want to clear ALL data? This will:\n\n• Delete your identity\n• Delete all saved peers\n• Delete all reconnection data\n• Clear all settings\n\nThis action cannot be undone. The page will reload after clearing.')) {
     try {
-      console.log('[App] Clearing all localStorage data...');
-
       const itemCount = localStorage.length;
       localStorage.clear();
 
-      console.log(`[App] Cleared ${itemCount} localStorage items`);
       addMessage(`All data cleared (${itemCount} items). Reloading...`, 'system');
 
       setTimeout(() => {
@@ -728,225 +721,6 @@ $('btnCloseSidebar').addEventListener('click', () => {
 });
 
 // ============================================
-// Connection Diagnostics Panel
-// ============================================
-
-function showDiagnostics() {
-  // Dynamically import diagnostics module
-  import('./diagnostics/connection-diagnostics.js').then((module) => {
-    const diagnostics = module.default;
-    const globalStats = diagnostics.getGlobalStats();
-    const summary = diagnostics.getSummary();
-
-    // Build connection type rows
-    let connectionTypeRows = '';
-    if (globalStats.connectionsByType && globalStats.connectionsByType.length > 0) {
-      const maxCount = Math.max(...globalStats.connectionsByType.map((c) => c.count));
-      connectionTypeRows = globalStats.connectionsByType
-        .map(
-          ({ type, count }) => `
-          <div class="connection-type-row">
-            <span class="type-name">${type}</span>
-            <span class="type-count">${count}</span>
-            <div class="type-bar" style="width: ${(count / maxCount) * 100}%"></div>
-          </div>
-        `
-        )
-        .join('');
-    } else {
-      connectionTypeRows = '<div class="no-data">No connection data yet</div>';
-    }
-
-    // Build current connections list
-    let currentConnectionsHTML = '';
-    const connectedPeers = Array.from(mesh.peers.entries()).filter(
-      ([id, data]) => data.status === 'connected' && id !== '_temp'
-    );
-
-    if (connectedPeers.length > 0) {
-      currentConnectionsHTML = connectedPeers
-        .map(([id, data]) => {
-          const diag = diagnostics.getDiagnostics(id);
-          return `
-            <div class="connection-detail">
-              <div class="connection-name">${data.displayName}</div>
-              <div class="connection-info">
-                <span><i class="ti ti-plug"></i> ${diag?.connectionType?.name || 'Unknown'}</span>
-                <span><i class="ti ti-network"></i> ${diag?.protocol || 'Unknown'}</span>
-                ${
-                  diag?.timing.connectionTime
-                    ? `<span><i class="ti ti-clock"></i> ${diag.timing.connectionTime}ms</span>`
-                    : ''
-                }
-                ${
-                  diag?.rtt
-                    ? `<span><i class="ti ti-activity"></i> RTT: ${(diag.rtt * 1000).toFixed(1)}ms</span>`
-                    : ''
-                }
-              </div>
-            </div>
-          `;
-        })
-        .join('');
-    } else {
-      currentConnectionsHTML = '<div class="no-data">No active connections</div>';
-    }
-
-    // Create modal HTML
-    const diagHTML = `
-      <div class="diagnostics-modal" id="diagnosticsModal">
-        <div class="diagnostics-overlay"></div>
-        <div class="diagnostics-content">
-          <div class="diagnostics-header">
-            <h2><i class="ti ti-activity"></i> Connection Diagnostics</h2>
-            <button class="btn-close-diagnostics" id="btnCloseDiagnostics">
-              <i class="ti ti-x"></i>
-            </button>
-          </div>
-
-          <div class="diagnostics-body">
-            <!-- Global Statistics -->
-            <div class="diag-section">
-              <h3>Global Statistics</h3>
-              <div class="diag-grid">
-                <div class="diag-stat">
-                  <span class="diag-label">Total Attempts:</span>
-                  <span class="diag-value">${globalStats.totalAttempts}</span>
-                </div>
-                <div class="diag-stat">
-                  <span class="diag-label">Successful:</span>
-                  <span class="diag-value success">${globalStats.successfulConnections}</span>
-                </div>
-                <div class="diag-stat">
-                  <span class="diag-label">Failed:</span>
-                  <span class="diag-value error">${globalStats.failedConnections}</span>
-                </div>
-                <div class="diag-stat">
-                  <span class="diag-label">Success Rate:</span>
-                  <span class="diag-value">${globalStats.successRate}%</span>
-                </div>
-                <div class="diag-stat">
-                  <span class="diag-label">Avg Connection Time:</span>
-                  <span class="diag-value">${Math.round(globalStats.avgConnectionTime)}ms</span>
-                </div>
-                <div class="diag-stat">
-                  <span class="diag-label">Avg ICE Gathering:</span>
-                  <span class="diag-value">${Math.round(globalStats.avgGatheringTime)}ms</span>
-                </div>
-              </div>
-            </div>
-
-            <!-- Connection Types -->
-            <div class="diag-section">
-              <h3>Connections by Type</h3>
-              <div class="connection-types">
-                ${connectionTypeRows}
-              </div>
-            </div>
-
-            <!-- Current Connections -->
-            <div class="diag-section">
-              <h3>Current Connections (${connectedPeers.length})</h3>
-              <div class="current-connections">
-                ${currentConnectionsHTML}
-              </div>
-            </div>
-
-            <!-- ICE Candidate Statistics -->
-            <div class="diag-section">
-              <h3>ICE Candidate Statistics</h3>
-              <div class="diag-grid">
-                <div class="diag-stat">
-                  <span class="diag-label">Avg Host Candidates:</span>
-                  <span class="diag-value">${summary.candidateStats.avgHostCandidates}</span>
-                </div>
-                <div class="diag-stat">
-                  <span class="diag-label">Avg STUN Candidates:</span>
-                  <span class="diag-value">${summary.candidateStats.avgSrflxCandidates}</span>
-                </div>
-                <div class="diag-stat">
-                  <span class="diag-label">Avg TURN Candidates:</span>
-                  <span class="diag-value">${summary.candidateStats.avgRelayCandidates}</span>
-                </div>
-                <div class="diag-stat">
-                  <span class="diag-label">Total Avg Candidates:</span>
-                  <span class="diag-value">${summary.candidateStats.totalCandidates}</span>
-                </div>
-              </div>
-            </div>
-
-            <!-- Export Button -->
-            <div class="diag-section">
-              <button class="btn-export-diagnostics" id="btnExportDiagnostics">
-                <i class="ti ti-download"></i>
-                <span>Export Diagnostics JSON</span>
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
-    `;
-
-    // Add to DOM
-    const existingModal = document.getElementById('diagnosticsModal');
-    if (existingModal) {
-      existingModal.remove();
-    }
-
-    document.body.insertAdjacentHTML('beforeend', diagHTML);
-
-    // Set up event listeners
-    $('btnCloseDiagnostics').onclick = closeDiagnostics;
-    $('diagnosticsModal').querySelector('.diagnostics-overlay').onclick = closeDiagnostics;
-    $('btnExportDiagnostics').onclick = exportDiagnostics;
-
-    // Close on ESC key
-    const escapeHandler = (e) => {
-      if (e.key === 'Escape') {
-        closeDiagnostics();
-        document.removeEventListener('keydown', escapeHandler);
-      }
-    };
-    document.addEventListener('keydown', escapeHandler);
-  });
-}
-
-function closeDiagnostics() {
-  const modal = document.getElementById('diagnosticsModal');
-  if (modal) {
-    modal.remove();
-  }
-}
-
-function exportDiagnostics() {
-  import('./diagnostics/connection-diagnostics.js').then((module) => {
-    const diagnostics = module.default;
-    const data = diagnostics.exportDiagnostics();
-
-    const blob = new Blob([data], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `connection-diagnostics-${Date.now()}.json`;
-    a.click();
-    URL.revokeObjectURL(url);
-
-    // Show feedback
-    const exportBtn = $('btnExportDiagnostics');
-    const originalHTML = exportBtn.innerHTML;
-    exportBtn.innerHTML = '<i class="ti ti-check"></i><span>Exported!</span>';
-    setTimeout(() => {
-      exportBtn.innerHTML = originalHTML;
-    }, 2000);
-  });
-}
-
-// Diagnostics button click handler
-$('btnDiagnostics').onclick = () => {
-  showDiagnostics();
-};
-
-// ============================================
 // PWA Install Manager
 // ============================================
 
@@ -970,14 +744,11 @@ class PWAInstallManager {
   init() {
     // If already installed, keep button hidden
     if (this.isInstalled) {
-      console.log('PWA is already installed');
       return;
     }
 
     // Listen for the beforeinstallprompt event
     window.addEventListener('beforeinstallprompt', (e) => {
-      console.log('beforeinstallprompt event fired');
-
       // Prevent the default browser install prompt
       e.preventDefault();
 
@@ -990,7 +761,6 @@ class PWAInstallManager {
 
     // Listen for successful installation
     window.addEventListener('appinstalled', () => {
-      console.log('PWA installed successfully');
       this.handleInstallSuccess();
     });
 
@@ -1038,8 +808,6 @@ class PWAInstallManager {
 
       // Wait for user response
       const { outcome } = await this.deferredPrompt.userChoice;
-
-      console.log(`User response to install prompt: ${outcome}`);
 
       if (outcome === 'accepted') {
         // Show success state temporarily
@@ -1118,8 +886,6 @@ class PWAInstallManager {
 // Listen for service worker updates and reload the page
 if ('serviceWorker' in navigator) {
   navigator.serviceWorker.addEventListener('controllerchange', () => {
-    console.log('[SW] New service worker activated, reloading page to load updated code...');
-
     // Show notification before reload (optional)
     addMessage('New version installed. Reloading...', 'system');
 
@@ -1136,17 +902,12 @@ if ('serviceWorker' in navigator) {
 
 async function initializeReconnection() {
   const startTime = Date.now();
-  console.log('[App] Initializing automatic reconnection...');
-  console.log(`[App] Document ready state: ${document.readyState}`);
-  console.log(`[App] Mesh reconnection ready: ${mesh.reconnectionReady}`);
 
   try {
     // Wait for reconnection system initialization if not ready
     if (!mesh.reconnectionReady) {
-      console.log('[App] Waiting for reconnection system initialization...');
       try {
         await mesh._initPromise;
-        console.log('[App] Reconnection system initialized');
       } catch (error) {
         console.error('[App] Reconnection system initialization failed:', error);
         addMessage('Reconnection system unavailable. Click "New Connection" to connect.', 'system');
@@ -1156,14 +917,12 @@ async function initializeReconnection() {
 
     // Verify reconnection system is properly initialized
     if (!mesh.reconnectionEnabled || !mesh.masterReconnect) {
-      console.warn('[App] Reconnection system not properly initialized');
       addMessage('Reconnection disabled. Click "New Connection" to connect.', 'system');
       return;
     }
 
     // Check if we're online before attempting reconnection
     if (!navigator.onLine) {
-      console.log('[App] Offline, skipping reconnection attempt');
       addMessage('You are offline. Reconnection will start when back online.', 'system');
       return;
     }
@@ -1176,12 +935,10 @@ async function initializeReconnection() {
     if (result.fallbackRequired || result.method === 'cold_start_failed') {
       // All automatic reconnection failed, show manual pairing UI
       const totalTime = Date.now() - startTime;
-      console.log(`[App] Automatic reconnection failed (total: ${totalTime}ms, reconnect: ${reconnectTime}ms)`);
       addMessage('No saved connections found. Click "New Connection" to connect.', 'system');
     } else if (result.peersConnected > 0) {
       // Successfully reconnected
       const totalTime = Date.now() - startTime;
-      console.log(`[App] Reconnected to ${result.peersConnected} peer(s) (total: ${totalTime}ms, reconnect: ${reconnectTime}ms)`);
       addMessage(`Reconnected to ${result.peersConnected} peer(s) automatically!`, 'system');
 
       // Enable UI
@@ -1190,7 +947,6 @@ async function initializeReconnection() {
     } else {
       // No peers to reconnect to
       const totalTime = Date.now() - startTime;
-      console.log(`[App] No peers available for reconnection (total: ${totalTime}ms, reconnect: ${reconnectTime}ms)`);
       addMessage('No saved connections. Click "New Connection" to connect.', 'system');
     }
   } catch (error) {
@@ -1204,46 +960,46 @@ async function initializeReconnection() {
 window.showReconnectionStats = () => {
   const stats = mesh.getReconnectionStats();
   if (!stats) {
-    console.log('Reconnection system not enabled');
     return;
   }
 
-  console.log('='.repeat(50));
-  console.log('RECONNECTION SYSTEM STATISTICS');
-  console.log('='.repeat(50));
+  const output = [];
+  output.push('='.repeat(50));
+  output.push('RECONNECTION SYSTEM STATISTICS');
+  output.push('='.repeat(50));
 
   if (stats.master) {
-    console.log('\n📊 Master Strategy:');
-    console.log('  Total attempts:', stats.master.totalReconnectionAttempts);
-    console.log('  Successful:', stats.master.successfulReconnections);
-    console.log('  Failed:', stats.master.failedReconnections);
-    console.log('  Success rate:',
+    output.push('\nMaster Strategy:');
+    output.push('  Total attempts: ' + stats.master.totalReconnectionAttempts);
+    output.push('  Successful: ' + stats.master.successfulReconnections);
+    output.push('  Failed: ' + stats.master.failedReconnections);
+    output.push('  Success rate: ' + (
       stats.master.totalReconnectionAttempts > 0
         ? `${((stats.master.successfulReconnections / stats.master.totalReconnectionAttempts) * 100).toFixed(1)}%`
         : 'N/A'
-    );
+    ));
   }
 
   if (stats.persistence) {
-    console.log('\n💾 Persistence:');
-    console.log('  Total saved peers:', stats.persistence.totalPeers);
-    console.log('  Needs cleanup:', stats.persistence.needsCleanup);
+    output.push('\nPersistence:');
+    output.push('  Total saved peers: ' + stats.persistence.totalPeers);
+    output.push('  Needs cleanup: ' + stats.persistence.needsCleanup);
   }
 
   if (stats.network) {
-    console.log('\n🌐 Network:');
-    console.log('  IP changes:', stats.network.ipChangeCount);
-    console.log('  Connection type:', stats.network.currentConnectionType);
-    console.log('  Online:', stats.network.isOnline);
+    output.push('\nNetwork:');
+    output.push('  IP changes: ' + stats.network.ipChangeCount);
+    output.push('  Connection type: ' + stats.network.currentConnectionType);
+    output.push('  Online: ' + stats.network.isOnline);
   }
 
-  console.log('\n' + '='.repeat(50));
+  output.push('\n' + '='.repeat(50));
+  return output.join('\n');
 };
 
 async function showSavedPeers() {
   if (!mesh.peerPersistence) {
-    console.log('Peer persistence not available');
-    return;
+    return 'Peer persistence not available';
   }
 
   const candidates = await mesh.peerPersistence.getReconnectionCandidates({
@@ -1252,18 +1008,18 @@ async function showSavedPeers() {
   });
 
   if (candidates.length === 0) {
-    console.log('No saved peers found');
-    return;
+    return 'No saved peers found';
   }
 
-  console.log(`📋 Saved Peers (${candidates.length}):`);
+  const output = [`Saved Peers (${candidates.length}):`];
   for (const candidate of candidates.slice(0, 10)) {
     const peer = candidate.peer;
     const lastSeen = new Date(peer.lastSeen).toLocaleString();
-    const status = mesh.peers.has(peer.peerId) ? '🟢 Connected' : '⚪ Disconnected';
-    console.log(`${status} ${peer.displayName} (score: ${candidate.score})`);
-    console.log(`   Last seen: ${lastSeen}`);
+    const status = mesh.peers.has(peer.peerId) ? 'Connected' : 'Disconnected';
+    output.push(`${status} ${peer.displayName} (score: ${candidate.score})`);
+    output.push(`   Last seen: ${lastSeen}`);
   }
+  return output.join('\n');
 }
 
 window.showSavedPeers = showSavedPeers;
@@ -1292,7 +1048,6 @@ try {
   markdownInput = new MarkdownInput('messageInput', {
     debounceDelay: 300
   });
-  console.log('[App] Markdown input initialized');
 } catch (error) {
   console.error('[App] Failed to initialize markdown input:', error);
 }

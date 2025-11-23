@@ -160,14 +160,12 @@ class ConnectionManager {
 
     // Too few connections?
     if (currentCount < this.config.minConnections) {
-      console.log(`[Connection] Below minimum connections (${currentCount}/${this.config.minConnections})`);
       // Would need to trigger peer discovery, but that's handled by introduction manager
       return;
     }
 
     // Too many connections?
     if (currentCount > this.config.maxConnections) {
-      console.log(`[Connection] Above maximum connections (${currentCount}/${this.config.maxConnections}), pruning...`);
       this.pruneWorstConnection();
       return;
     }
@@ -175,7 +173,6 @@ class ConnectionManager {
     // Check for low-quality connections
     const lowQuality = this.findLowQualityConnections();
     if (lowQuality.length > 0) {
-      console.log(`[Connection] Found ${lowQuality.length} low-quality connections`);
       // Could trigger replacement, but for now just log
     }
   }
@@ -200,7 +197,6 @@ class ConnectionManager {
   pruneWorstConnection() {
     const worst = this.getWorstConnection();
     if (worst && this.peerManager) {
-      console.log(`[Connection] Pruning worst connection: ${worst.peerId.substring(0, 8)} (score: ${worst.score})`);
       const peerData = this.peerManager.peers.get(worst.peerId);
       if (peerData && peerData.peer) {
         peerData.peer.destroy();

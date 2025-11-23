@@ -228,87 +228,6 @@ export const ICE_CONFIG = {
 };
 
 // ============================================
-// Alternative Configurations
-// ============================================
-
-/**
- * Relay-Only Configuration
- * Forces all connections through TURN servers
- * Useful for:
- * - Testing TURN server functionality
- * - Privacy-focused applications (hide real IP)
- * - Troubleshooting direct connection issues
- */
-export const ICE_CONFIG_RELAY_ONLY = {
-  ...ICE_CONFIG,
-  iceTransportPolicy: 'relay' // Force relay, no direct connections
-};
-
-/**
- * Minimal Configuration
- * Uses only essential STUN/TURN servers
- * Useful for:
- * - Bandwidth-constrained environments
- * - Quick testing
- * - Reducing ICE gathering time
- */
-export const ICE_CONFIG_MINIMAL = {
-  iceServers: [
-    // Single STUN server
-    {
-      urls: 'stun:stun.l.google.com:19302'
-    },
-    // Single TURN server (most reliable transport)
-    {
-      urls: `turn:${OPENRELAY_HOST}:443?transport=tcp`,
-      username: OPENRELAY_USERNAME,
-      credential: OPENRELAY_CREDENTIAL
-    }
-  ],
-  iceTransportPolicy: 'all',
-  iceCandidatePoolSize: 5,
-  bundlePolicy: 'max-bundle',
-  rtcpMuxPolicy: 'require'
-};
-
-/**
- * Testing Configuration - UDP Only
- * Test if UDP connections work
- */
-export const ICE_CONFIG_UDP_ONLY = {
-  iceServers: [
-    { urls: 'stun:stun.l.google.com:19302' },
-    {
-      urls: `turn:${OPENRELAY_HOST}:443`,
-      username: OPENRELAY_USERNAME,
-      credential: OPENRELAY_CREDENTIAL
-    }
-  ],
-  iceTransportPolicy: 'all',
-  iceCandidatePoolSize: 10,
-  bundlePolicy: 'max-bundle',
-  rtcpMuxPolicy: 'require'
-};
-
-/**
- * Testing Configuration - TCP Only
- * Test TCP fallback paths
- */
-export const ICE_CONFIG_TCP_ONLY = {
-  iceServers: [
-    {
-      urls: `turn:${OPENRELAY_HOST}:443?transport=tcp`,
-      username: OPENRELAY_USERNAME,
-      credential: OPENRELAY_CREDENTIAL
-    }
-  ],
-  iceTransportPolicy: 'relay', // Force TURN to test TCP
-  iceCandidatePoolSize: 5,
-  bundlePolicy: 'max-bundle',
-  rtcpMuxPolicy: 'require'
-};
-
-// ============================================
 // Helper Functions
 // ============================================
 
@@ -371,17 +290,6 @@ export function detectConnectionType(localCandidate, remoteCandidate) {
 }
 
 /**
- * Get human-readable connection type name
- * @param {RTCIceCandidate} localCandidate - Local ICE candidate
- * @param {RTCIceCandidate} remoteCandidate - Remote ICE candidate
- * @returns {string} Connection type name
- */
-export function getConnectionTypeName(localCandidate, remoteCandidate) {
-  const connType = detectConnectionType(localCandidate, remoteCandidate);
-  return connType.name;
-}
-
-/**
  * Get connection type from stats report
  * @param {RTCStatsReport} stats - Stats from getStats()
  * @returns {Object} Connection type information
@@ -441,27 +349,5 @@ export function isDirectConnection(connectionType) {
 export function isRelayedConnection(connectionType) {
   return connectionType.category === 'relay';
 }
-
-/**
- * Get configuration by name
- * @param {string} name - Configuration name
- * @returns {Object} ICE configuration object
- */
-export function getConfigByName(name) {
-  const configs = {
-    'default': ICE_CONFIG,
-    'full': ICE_CONFIG,
-    'relay-only': ICE_CONFIG_RELAY_ONLY,
-    'minimal': ICE_CONFIG_MINIMAL,
-    'udp-only': ICE_CONFIG_UDP_ONLY,
-    'tcp-only': ICE_CONFIG_TCP_ONLY
-  };
-
-  return configs[name] || ICE_CONFIG;
-}
-
-// ============================================
-// Exports
-// ============================================
 
 export default ICE_CONFIG;

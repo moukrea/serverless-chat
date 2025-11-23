@@ -110,8 +110,6 @@ class ReconnectionManager {
 
     // Start periodic cleanup
     this.startCleanup();
-
-    console.log('[ReconnectionManager] Initialized');
   }
 
   // ===========================================================================
@@ -137,8 +135,6 @@ class ReconnectionManager {
 
     this.router.on(RECONNECT_MESSAGE_TYPES.PATH_RESPONSE,
       msg => this.handlePathResponse(msg));
-
-    console.log('[ReconnectionManager] Message handlers registered');
   }
 
   // ===========================================================================
@@ -161,8 +157,6 @@ class ReconnectionManager {
    * }
    */
   async reconnectViaMesh(targetPeerId, targetName) {
-    console.log(`[ReconnectionManager] Attempting reconnection to ${targetName} (${targetPeerId.substring(0, 8)})`);
-
     this.stats.totalAttempts++;
 
     // Validation
@@ -177,23 +171,19 @@ class ReconnectionManager {
 
     // Check if already connected
     if (this.peerManager.peers.has(targetPeerId)) {
-      console.log('[ReconnectionManager] Already connected to target peer');
       return { success: false, reason: 'already_connected' };
     }
 
     // Check concurrent reconnection limit
     if (this.pendingReconnects.size >= this.config.maxConcurrentReconnects) {
-      console.warn('[ReconnectionManager] Too many concurrent reconnection attempts');
       return { success: false, reason: 'too_many_concurrent_attempts' };
     }
 
     try {
       // Step 1: Find path to target peer
-      console.log('[ReconnectionManager] Step 1: Finding path to target peer...');
       const hasPath = await this.findPathToTarget(targetPeerId, this.config.pathQueryTimeout);
 
       if (!hasPath) {
-        console.warn('[ReconnectionManager] No path found to target peer');
         this.stats.pathNotFound++;
 
         // Record failed attempt
@@ -204,8 +194,6 @@ class ReconnectionManager {
         return { success: false, reason: 'no_path_found' };
       }
 
-      console.log('[ReconnectionManager] Path found! Proceeding with reconnection...');
-
       // Step 2: Create WebRTC peer connection (initiator)
       const peer = await this.createReconnectionPeer(true, targetPeerId, targetName);
 
@@ -214,7 +202,6 @@ class ReconnectionManager {
 
       if (result.success) {
         this.stats.successful++;
-        console.log(`[ReconnectionManager] Successfully reconnected to ${targetName}`);
 
         // Update persistence
         if (this.peerPersistence) {
@@ -267,8 +254,6 @@ class ReconnectionManager {
   async findPathToTarget(targetPeerId, timeout = 5000) {
     const queryId = this.generateId('query');
 
-    console.log(`[ReconnectionManager] Querying mesh for path to ${targetPeerId.substring(0, 8)}`);
-
     return new Promise((resolve, reject) => {
       // Create query tracking
       this.activeQueries.set(queryId, {
@@ -282,8 +267,6 @@ class ReconnectionManager {
       const timeoutHandle = setTimeout(() => {
         const responses = this.pathQueryResponses.get(queryId);
         const hasPath = responses && responses.size > 0;
-
-        console.log(`[ReconnectionManager] Path query timeout. Responses: ${responses ? responses.size : 0}`);
 
         // Cleanup
         this.activeQueries.delete(queryId);
@@ -329,14 +312,10 @@ class ReconnectionManager {
       return;
     }
 
-    console.log(`[ReconnectionManager] Path query received: looking for ${targetPeerId.substring(0, 8)}`);
-
     // Check if we're connected to the target
     const isConnected = this.peerManager.peers.has(targetPeerId);
 
     if (isConnected) {
-      console.log(`[ReconnectionManager] We are connected to target! Sending path response...`);
-
       // Send response back to query origin
       const responseMessage = this.router.createMessage(
         RECONNECT_MESSAGE_TYPES.PATH_RESPONSE,
@@ -368,8 +347,6 @@ class ReconnectionManager {
   handlePathResponse(message) {
     const { queryId, relayPeerId, relayName, hopCount } = message.payload;
 
-    console.log(`[ReconnectionManager] Path response: ${relayName} can relay (${hopCount} hops)`);
-
     // Get or create response set
     if (!this.pathQueryResponses.has(queryId)) {
       this.pathQueryResponses.set(queryId, new Set());
@@ -387,8 +364,6 @@ class ReconnectionManager {
     const activeQuery = this.activeQueries.get(queryId);
     if (activeQuery) {
       // We got at least one response, so we have a path
-      console.log('[ReconnectionManager] Path confirmed! Resolving query...');
-
       clearTimeout(activeQuery.timeout);
       activeQuery.resolve(true);
 
@@ -464,8 +439,6 @@ class ReconnectionManager {
   async sendOfferAndWaitForAnswer(peer, targetPeerId, targetName) {
     const reconnectId = this.generateId('reconnect');
 
-    console.log(`[ReconnectionManager] Sending offer to ${targetName}...`);
-
     return new Promise((resolve, reject) => {
       // Track this reconnection
       this.pendingReconnects.set(reconnectId, {
@@ -480,7 +453,6 @@ class ReconnectionManager {
 
       // Set overall timeout
       const timeoutHandle = setTimeout(() => {
-        console.warn(`[ReconnectionManager] Reconnection timeout for ${targetName}`);
         this.stats.timedOut++;
 
         peer.destroy();
@@ -519,15 +491,11 @@ class ReconnectionManager {
           if (pending) {
             pending.state = ReconnectionState.WAITING_ANSWER;
           }
-
-          console.log(`[ReconnectionManager] Offer sent, waiting for answer...`);
         }
       });
 
       // Handle connection establishment
       peer.on('connect', () => {
-        console.log(`[ReconnectionManager] WebRTC connection established with ${targetName}`);
-
         const pending = this.pendingReconnects.get(reconnectId);
         if (pending) {
           clearTimeout(pending.timeout);
@@ -587,18 +555,14 @@ class ReconnectionManager {
 
     this.stats.offersReceived++;
 
-    console.log(`[ReconnectionManager] Received reconnection offer from ${requesterName} (${requesterPeerId.substring(0, 8)})`);
-
     // Check if we should accept
     if (!this.shouldAcceptReconnection(requesterPeerId)) {
-      console.log(`[ReconnectionManager] Declining reconnection from ${requesterName}`);
       this.sendRejection(reconnectId, requesterPeerId, 'declined');
       return;
     }
 
     // Check if already connected
     if (this.peerManager.peers.has(requesterPeerId)) {
-      console.log(`[ReconnectionManager] Already connected to ${requesterName}`);
       this.sendRejection(reconnectId, requesterPeerId, 'already_connected');
       return;
     }
@@ -612,8 +576,6 @@ class ReconnectionManager {
 
       // Set up connection handlers
       peer.on('connect', () => {
-        console.log(`[ReconnectionManager] Reconnected with ${requesterName}`);
-
         // Register peer
         this.peerManager.registerReconnectedPeer(requesterPeerId, requesterName, peer);
 
@@ -630,8 +592,6 @@ class ReconnectionManager {
       // Wait for answer signal
       peer.on('signal', data => {
         if (data.type === 'answer') {
-          console.log(`[ReconnectionManager] Sending answer to ${requesterName}...`);
-
           // Send answer through mesh
           const answerMessage = this.router.createMessage(
             RECONNECT_MESSAGE_TYPES.RECONNECT_ANSWER,
@@ -675,12 +635,9 @@ class ReconnectionManager {
 
     this.stats.answersReceived++;
 
-    console.log(`[ReconnectionManager] Received answer from ${acceptorName} (${acceptorPeerId.substring(0, 8)})`);
-
     // Find pending reconnection
     const pending = this.pendingReconnects.get(reconnectId);
     if (!pending) {
-      console.warn(`[ReconnectionManager] No pending reconnection for ID ${reconnectId}`);
       return;
     }
 
@@ -693,8 +650,6 @@ class ReconnectionManager {
 
       // Update state
       pending.state = ReconnectionState.CONNECTING;
-
-      console.log(`[ReconnectionManager] Answer applied, WebRTC connecting...`);
 
     } catch (error) {
       console.error('[ReconnectionManager] Error handling answer:', error);
@@ -718,8 +673,6 @@ class ReconnectionManager {
    */
   handleReconnectRejection(message) {
     const { reconnectId, reason } = message.payload;
-
-    console.log(`[ReconnectionManager] Reconnection rejected: ${reason}`);
 
     this.stats.rejected++;
 
@@ -763,7 +716,6 @@ class ReconnectionManager {
     // Only one peer should initiate to prevent duplicate connections
     if (this.identity.uuid < requesterPeerId) {
       // We should initiate, not them
-      console.log('[ReconnectionManager] Tie-breaking: we should initiate');
       return false;
     }
 
@@ -772,7 +724,6 @@ class ReconnectionManager {
     const maxConnections = this.peerManager.maxConnections || 6;
 
     if (currentCount >= maxConnections) {
-      console.log(`[ReconnectionManager] At max connections (${currentCount}/${maxConnections})`);
       return false;
     }
 
@@ -862,16 +813,11 @@ class ReconnectionManager {
     // Cleanup stale reconnections (shouldn't happen with timeouts, but just in case)
     for (const [reconnectId, pending] of this.pendingReconnects.entries()) {
       if (now - pending.startTime > this.config.reconnectTimeout + 10000) { // Extra 10s grace period
-        console.warn(`[ReconnectionManager] Cleaning up stale reconnection ${reconnectId}`);
         clearTimeout(pending.timeout);
         pending.peer.destroy();
         this.pendingReconnects.delete(reconnectId);
         cleaned++;
       }
-    }
-
-    if (cleaned > 0) {
-      console.log(`[ReconnectionManager] Cleaned up ${cleaned} stale entries`);
     }
   }
 
@@ -945,8 +891,6 @@ class ReconnectionManager {
     this.activeQueries.clear();
 
     this.pathQueryResponses.clear();
-
-    console.log('[ReconnectionManager] Stopped');
   }
 }
 

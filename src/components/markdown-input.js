@@ -24,7 +24,6 @@ class MarkdownInput {
   createPreviewElement() {
     const wrapper = this.textarea.closest('.message-input-wrapper');
     if (!wrapper) {
-      console.warn('[MarkdownInput] Textarea must be inside .message-input-wrapper');
       return;
     }
 

@@ -134,8 +134,6 @@ class ColdStartManager {
     this.recoveryStartTime = null;
     this.currentLayer = null;
     this.attemptLog = [];
-
-    console.log('[ColdStart] Manager initialized');
   }
 
   // ===========================================================================
@@ -149,7 +147,6 @@ class ColdStartManager {
    */
   async handleColdStart() {
     if (this.isRecovering) {
-      console.warn('[ColdStart] Recovery already in progress');
       return { success: false, reason: 'recovery_in_progress' };
     }
 
@@ -157,19 +154,12 @@ class ColdStartManager {
     this.recoveryStartTime = Date.now();
     this.attemptLog = [];
 
-    console.log('[ColdStart] ========================================');
-    console.log('[ColdStart] COLD START RECOVERY INITIATED');
-    console.log('[ColdStart] No active connections, attempting recovery...');
-    console.log('[ColdStart] ========================================');
-
     try {
       // Layer 1: Recent Peers (< 5 min) - Highest priority
-      console.log('[ColdStart] Layer 1: Attempting recent peers (< 5 min)...');
       this.currentLayer = 'recent_peers';
       const recentResult = await this.tryRecentPeers();
 
       if (recentResult.connected > 0) {
-        console.log(`[ColdStart] ✓ Success via Layer 1: Connected to ${recentResult.connected} peer(s)`);
         this.logAttempt('recent_peers', true, recentResult.connected);
         await this.useWarmMeshForRest();
         this.isRecovering = false;
@@ -184,12 +174,10 @@ class ColdStartManager {
 
       // Layer 2: Knock Protocol (Experimental) - Wake NAT bindings
       if (COLD_START_CONFIG.KNOCK.ENABLED) {
-        console.log('[ColdStart] Layer 2: Attempting knock protocol (experimental)...');
         this.currentLayer = 'knock_protocol';
         const knockResult = await this.tryKnockProtocol();
 
         if (knockResult.connected > 0) {
-          console.log(`[ColdStart] ✓ Success via Layer 2: Knock protocol woke ${knockResult.connected} peer(s)`);
           this.logAttempt('knock_protocol', true, knockResult.connected);
           await this.useWarmMeshForRest();
           this.isRecovering = false;
@@ -204,12 +192,10 @@ class ColdStartManager {
       }
 
       // Layer 3: All Known Peers (< 24 hours) - Aggressive attempt
-      console.log('[ColdStart] Layer 3: Attempting all known peers (< 24h)...');
       this.currentLayer = 'all_known_peers';
       const allPeersResult = await this.tryAllKnownPeers();
 
       if (allPeersResult.connected > 0) {
-        console.log(`[ColdStart] ✓ Success via Layer 3: Connected to ${allPeersResult.connected} peer(s)`);
         this.logAttempt('all_known_peers', true, allPeersResult.connected);
         await this.useWarmMeshForRest();
         this.isRecovering = false;
@@ -223,12 +209,10 @@ class ColdStartManager {
       this.logAttempt('all_known_peers', false, 0);
 
       // Layer 4: Initial Pairing Fallback - Manual intervention
-      console.log('[ColdStart] Layer 4: Falling back to initial pairing...');
       this.currentLayer = 'initial_pairing';
       const fallbackResult = await this.fallbackToInitialPairing();
 
       if (fallbackResult.success) {
-        console.log('[ColdStart] ✓ Success via Layer 4: Initial pairing fallback');
         this.logAttempt('initial_pairing', true, 1);
         this.isRecovering = false;
         return {
@@ -240,10 +224,6 @@ class ColdStartManager {
       }
 
       // Layer 5: Complete Failure
-      console.log('[ColdStart] ========================================');
-      console.log('[ColdStart] ✗ RECOVERY FAILED - All layers exhausted');
-      console.log('[ColdStart] Entering offline mode with manual pairing option');
-      console.log('[ColdStart] ========================================');
       this.currentLayer = 'failed';
       this.logAttempt('complete_failure', false, 0);
       this.printRecoveryLog();
@@ -281,14 +261,10 @@ class ColdStartManager {
     );
 
     if (recentPeers.length === 0) {
-      console.log('[ColdStart] No recent peers found (< 5 min)');
       return { connected: 0, peers: [] };
     }
 
     const candidates = recentPeers.slice(0, COLD_START_CONFIG.RECENT_PEERS.MAX_ATTEMPTS);
-    console.log(`[ColdStart] Found ${candidates.length} recent peer(s):`,
-      candidates.map(p => `${p.displayName} (${p.peerId.substring(0, 8)})`).join(', ')
-    );
 
     return await this.tryDirectReconnections(
       candidates,
@@ -318,11 +294,8 @@ class ColdStartManager {
     }
 
     if (peers.length === 0) {
-      console.log('[ColdStart] No peers available for knock protocol');
       return { connected: 0 };
     }
-
-    console.log(`[ColdStart] Attempting knock protocol on ${peers.length} peer(s)...`);
 
     // Try knock on all peers in parallel
     const knockPromises = peers.map(peer =>
@@ -336,8 +309,6 @@ class ColdStartManager {
       .map(r => r.value);
 
     if (successes.length > 0) {
-      console.log(`[ColdStart] Knock protocol succeeded for ${successes.length} peer(s)`);
-
       // Once knock succeeds, try actual reconnection
       const knockedPeers = peers.filter(p =>
         successes.some(s => s.peerId === p.peerId)
@@ -346,7 +317,6 @@ class ColdStartManager {
       return await this.tryDirectReconnections(knockedPeers, timeout * 2);
     }
 
-    console.log('[ColdStart] Knock protocol failed for all peers');
     return { connected: 0 };
   }
 
@@ -359,8 +329,6 @@ class ColdStartManager {
    * @returns {Promise<{success: boolean, reason?: string}>}
    */
   async sendKnock(peer, timeout) {
-    console.log(`[ColdStart] Sending knock to ${peer.displayName} (${peer.peerId.substring(0, 8)})...`);
-
     return new Promise((resolve) => {
       const pc = new RTCPeerConnection(ICE_CONFIG);
 
@@ -373,7 +341,6 @@ class ColdStartManager {
       pc.oniceconnectionstatechange = () => {
         if (pc.iceConnectionState === 'connected') {
           clearTimeout(timer);
-          console.log(`[ColdStart] ✓ Knock succeeded for ${peer.displayName}!`);
           pc.close();
           resolve({ success: true, peerId: peer.peerId });
         } else if (pc.iceConnectionState === 'failed' || pc.iceConnectionState === 'closed') {
@@ -431,14 +398,10 @@ class ColdStartManager {
     const allPeers = await this.getAllKnownPeers();
 
     if (allPeers.length === 0) {
-      console.log('[ColdStart] No known peers found (< 24h)');
       return { connected: 0, peers: [] };
     }
 
     const candidates = allPeers.slice(0, COLD_START_CONFIG.ALL_PEERS.MAX_ATTEMPTS);
-    console.log(`[ColdStart] Found ${candidates.length} known peer(s):`,
-      candidates.map(p => `${p.displayName} (${p.peerId.substring(0, 8)})`).join(', ')
-    );
 
     return await this.tryDirectReconnections(
       candidates,
@@ -462,8 +425,6 @@ class ColdStartManager {
       return { connected: 0, peers: [] };
     }
 
-    console.log(`[ColdStart] Attempting direct reconnection to ${peers.length} peer(s)...`);
-
     // If directReconnect module is available, use it
     if (this.directReconnect) {
       const attempts = peers.map(peer =>
@@ -483,8 +444,6 @@ class ColdStartManager {
         .map(r => r.value);
 
       if (successes.length > 0) {
-        console.log(`[ColdStart] ✓ Connected to ${successes.length} peer(s) directly`);
-
         // Once we have ONE connection, use mesh for the rest
         setTimeout(() => {
           this.useWarmMeshForRest();
@@ -497,7 +456,6 @@ class ColdStartManager {
     }
 
     // Fallback: If no direct reconnection module, try basic connection approach
-    console.log('[ColdStart] DirectReconnection module not available, using fallback');
     return await this.tryBasicReconnection(peers, timeout);
   }
 
@@ -509,8 +467,6 @@ class ColdStartManager {
    * @returns {Promise<{connected: number, peers: Array}>}
    */
   async tryBasicReconnection(peers, timeout) {
-    console.log('[ColdStart] Attempting basic reconnection...');
-
     // Create connection attempts
     const attempts = peers.map(peer =>
       this.attemptBasicConnection(peer, timeout)
@@ -528,11 +484,9 @@ class ColdStartManager {
       .map(r => r.value);
 
     if (successes.length > 0) {
-      console.log(`[ColdStart] ✓ Basic reconnection succeeded for ${successes.length} peer(s)`);
       return { connected: successes.length, peers: successes };
     }
 
-    console.log('[ColdStart] Basic reconnection failed for all peers');
     return { connected: 0, peers: [] };
   }
 
@@ -544,8 +498,6 @@ class ColdStartManager {
    */
   async attemptBasicConnection(peer, timeout) {
     return new Promise((resolve) => {
-      console.log(`[ColdStart] Basic connection to ${peer.displayName}...`);
-
       const timer = setTimeout(() => {
         resolve({ success: false, reason: 'timeout', peerId: peer.peerId });
       }, timeout);
@@ -573,32 +525,19 @@ class ColdStartManager {
    * Announce presence to mesh and wait for other peers to reconnect
    */
   async useWarmMeshForRest() {
-    console.log('[ColdStart] ========================================');
-    console.log('[ColdStart] Got warm connection! Announcing to mesh...');
-    console.log('[ColdStart] ========================================');
-
     // Announce presence to mesh if announcements module is available
     if (this.announcements) {
       try {
         await this.announcements.announcePresence('cold_start_recovery');
-        console.log('[ColdStart] Presence announced to mesh');
       } catch (error) {
         console.error('[ColdStart] Failed to announce presence:', error);
       }
-    } else {
-      console.log('[ColdStart] Announcement module not available');
     }
 
     // Wait for mesh to propagate and other peers to reconnect
-    console.log(`[ColdStart] Waiting ${COLD_START_CONFIG.WARM_MESH.WAIT_FOR_MESH_MS}ms for mesh propagation...`);
     await new Promise(resolve =>
       setTimeout(resolve, COLD_START_CONFIG.WARM_MESH.WAIT_FOR_MESH_MS)
     );
-
-    const connectedCount = this.peerManager.getConnectedPeerCount();
-    console.log('[ColdStart] ========================================');
-    console.log(`[ColdStart] Mesh recovery complete: ${connectedCount} peer(s) connected`);
-    console.log('[ColdStart] ========================================');
   }
 
   // ===========================================================================
@@ -611,16 +550,10 @@ class ColdStartManager {
    * @returns {Promise<{success: boolean, method?: string}>}
    */
   async fallbackToInitialPairing() {
-    console.log('[ColdStart] ========================================');
-    console.log('[ColdStart] FALLBACK TO INITIAL PAIRING');
-    console.log('[ColdStart] All automatic recovery methods failed');
-    console.log('[ColdStart] ========================================');
-
     // Reserved for future fallback mechanisms
 
     // Show UI for manual intervention
     if (COLD_START_CONFIG.FALLBACK.SHOW_PAIRING_UI) {
-      console.log('[ColdStart] Showing manual pairing UI...');
       this.showManualPairingUI();
     }
 
@@ -638,8 +571,6 @@ class ColdStartManager {
     if (typeof window === 'undefined') {
       return;
     }
-
-    console.log('[ColdStart] Dispatching show-pairing-ui event');
 
     const event = new CustomEvent('show-pairing-ui', {
       detail: {
@@ -793,23 +724,7 @@ class ColdStartManager {
    * Print recovery log summary
    */
   printRecoveryLog() {
-    console.log('[ColdStart] ========================================');
-    console.log('[ColdStart] RECOVERY ATTEMPT LOG');
-    console.log('[ColdStart] ========================================');
-
-    this.attemptLog.forEach((entry, index) => {
-      const status = entry.success ? '✓' : '✗';
-      const elapsed = (entry.elapsed / 1000).toFixed(1);
-      console.log(
-        `[ColdStart] ${index + 1}. ${status} ${entry.layer} ` +
-        `(${elapsed}s) - Connected: ${entry.connected}`
-      );
-    });
-
-    const totalTime = (Date.now() - this.recoveryStartTime) / 1000;
-    console.log('[ColdStart] ========================================');
-    console.log(`[ColdStart] Total recovery time: ${totalTime.toFixed(1)}s`);
-    console.log('[ColdStart] ========================================');
+    // Recovery log available via getStats()
   }
 
   /**

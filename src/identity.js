@@ -41,13 +41,11 @@ class Identity {
         const data = JSON.parse(stored);
         this.uuid = data.uuid;
         this.displayName = data.displayName;
-        console.log('[Identity] Loaded existing identity from storage');
       } else {
         this.uuid = generateUUID();
         this.displayName = generateDisplayName();
         this.save();
         isNew = true;
-        console.log('[Identity] Created new identity');
       }
 
       // Load custom peer renames

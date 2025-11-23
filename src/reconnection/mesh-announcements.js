@@ -87,8 +87,6 @@ class MeshAnnouncementManager {
 
     // Start cleanup timer
     this.startCleanup();
-
-    console.log('[AnnouncementManager] Initialized');
   }
 
   /**
@@ -98,8 +96,6 @@ class MeshAnnouncementManager {
     // Register message handlers with router
     this.router.on('peer_announcement', (msg) => this.handlePeerAnnouncement(msg));
     this.router.on('ip_change_announcement', (msg) => this.handleIpChange(msg));
-
-    console.log('[AnnouncementManager] Registered message handlers');
   }
 
   // ===========================================================================
@@ -117,8 +113,6 @@ class MeshAnnouncementManager {
    */
   async announcePresence(reason = ANNOUNCEMENT_CONFIG.REASONS.REJOIN) {
     try {
-      console.log(`[AnnouncementManager] Announcing presence (reason: ${reason})`);
-
       // Get list of currently connected peers for connection hints
       const connectedPeers = Array.from(this.peerManager.peers.keys())
         .filter(peerId => {
@@ -163,7 +157,6 @@ class MeshAnnouncementManager {
 
       this.stats.announcementsSent++;
 
-      console.log(`[AnnouncementManager] Presence announced (${reason})`);
       return true;
 
     } catch (error) {
@@ -193,12 +186,9 @@ class MeshAnnouncementManager {
         return;
       }
 
-      console.log(`[AnnouncementManager] Received announcement from ${displayName} (${peerId.substring(0, 8)})`);
-
       // Check for duplicate announcements
       if (this.isDuplicateAnnouncement(peerId, payload)) {
         this.stats.duplicatesIgnored++;
-        console.log(`[AnnouncementManager] Duplicate announcement from ${peerId.substring(0, 8)}, ignoring`);
         return;
       }
 
@@ -209,8 +199,6 @@ class MeshAnnouncementManager {
       const verification = await this.reconnectionAuth.verifyAnnouncement(payload);
 
       if (!verification.valid) {
-        console.warn(`[AnnouncementManager] Invalid announcement from ${peerId.substring(0, 8)}:`, verification.reason);
-
         // Log security alerts
         if (verification.reason === 'invalid_signature') {
           console.error('[AnnouncementManager] SECURITY: Invalid signature detected - possible impersonation attempt');
@@ -219,27 +207,21 @@ class MeshAnnouncementManager {
         return;
       }
 
-      console.log(`[AnnouncementManager] ✅ Valid announcement from ${displayName}`);
-
       // Check if we should reconnect to this peer
       const knownPeer = await this.peerPersistence.getPeer(peerId);
 
       if (!this.shouldReconnectToPeer(peerId, knownPeer)) {
-        console.log(`[AnnouncementManager] Not reconnecting to ${displayName}`);
         return;
       }
 
       // Deterministic tie-breaking: only one peer initiates
       if (!this.shouldInitiate(peerId)) {
-        console.log(`[AnnouncementManager] Waiting for ${displayName} to initiate reconnection`);
         return;
       }
 
       // Add random jitter to prevent thundering herd
       const delay = ANNOUNCEMENT_CONFIG.RECONNECTION_DELAY_MIN +
         Math.random() * (ANNOUNCEMENT_CONFIG.RECONNECTION_DELAY_MAX - ANNOUNCEMENT_CONFIG.RECONNECTION_DELAY_MIN);
-
-      console.log(`[AnnouncementManager] Will initiate reconnection to ${displayName} in ${Math.round(delay)}ms`);
 
       setTimeout(() => {
         this.initiateReconnection(peerId, displayName, payload.connectionHint);
@@ -264,8 +246,6 @@ class MeshAnnouncementManager {
    */
   async announceIpChange() {
     try {
-      console.log('[AnnouncementManager] Announcing IP change');
-
       // Create challenge for IP change proof
       const challenge = `ip-change-${Date.now()}`;
 
@@ -308,7 +288,6 @@ class MeshAnnouncementManager {
 
       this.stats.announcementsSent++;
 
-      console.log('[AnnouncementManager] IP change announced');
       return true;
 
     } catch (error) {
@@ -333,8 +312,6 @@ class MeshAnnouncementManager {
         return;
       }
 
-      console.log(`[AnnouncementManager] Received IP change announcement from ${displayName} (${peerId.substring(0, 8)})`);
-
       // Check for duplicates
       if (this.isDuplicateAnnouncement(peerId, payload)) {
         this.stats.duplicatesIgnored++;
@@ -348,16 +325,12 @@ class MeshAnnouncementManager {
       const verification = await this.reconnectionAuth.verifyAnnouncement(payload);
 
       if (!verification.valid) {
-        console.warn(`[AnnouncementManager] Invalid IP change announcement from ${peerId.substring(0, 8)}:`, verification.reason);
         return;
       }
-
-      console.log(`[AnnouncementManager] ✅ Valid IP change from ${displayName}`);
 
       // If we're currently connected to this peer, we might need to update connection
       const existingPeer = this.peerManager.peers.get(peerId);
       if (existingPeer && existingPeer.status === 'connected') {
-        console.log(`[AnnouncementManager] Already connected to ${displayName}, no action needed`);
         return;
       }
 
@@ -370,7 +343,6 @@ class MeshAnnouncementManager {
 
       // Deterministic tie-breaking
       if (!this.shouldInitiate(peerId)) {
-        console.log(`[AnnouncementManager] Waiting for ${displayName} to initiate after IP change`);
         return;
       }
 
@@ -403,16 +375,12 @@ class MeshAnnouncementManager {
     // Clear existing interval if any
     this.stopPeriodicAnnouncements();
 
-    console.log(`[AnnouncementManager] Starting periodic announcements (interval: ${interval}ms)`);
-
     this.announcementInterval = setInterval(async () => {
       // Only announce if we have connections
       const connectedCount = this.peerManager.getConnectedPeerCount();
 
       if (connectedCount >= ANNOUNCEMENT_CONFIG.MIN_PEERS_FOR_PERIODIC) {
         await this.announcePresence(ANNOUNCEMENT_CONFIG.REASONS.PERIODIC);
-      } else {
-        console.log('[AnnouncementManager] Skipping periodic announcement (no connected peers)');
       }
     }, interval);
   }
@@ -424,7 +392,6 @@ class MeshAnnouncementManager {
     if (this.announcementInterval) {
       clearInterval(this.announcementInterval);
       this.announcementInterval = null;
-      console.log('[AnnouncementManager] Stopped periodic announcements');
     }
   }
 
@@ -449,7 +416,6 @@ class MeshAnnouncementManager {
     // Check if already connected
     const existingPeer = this.peerManager.peers.get(peerId);
     if (existingPeer && (existingPeer.status === 'connected' || existingPeer.status === 'connecting')) {
-      console.log(`[AnnouncementManager] Already connected to ${peerId.substring(0, 8)}`);
       return false;
     }
 
@@ -458,7 +424,6 @@ class MeshAnnouncementManager {
     const maxConnections = this.peerManager.maxConnections || 6; // Default from mesh.js
 
     if (currentCount >= maxConnections) {
-      console.log(`[AnnouncementManager] At max connections (${currentCount}/${maxConnections})`);
       return false;
     }
 
@@ -467,14 +432,12 @@ class MeshAnnouncementManager {
     if (lastAttempt) {
       const timeSinceAttempt = Date.now() - lastAttempt;
       if (timeSinceAttempt < ANNOUNCEMENT_CONFIG.RECONNECTION_COOLDOWN) {
-        console.log(`[AnnouncementManager] Cooldown active for ${peerId.substring(0, 8)} (${Math.round(timeSinceAttempt / 1000)}s ago)`);
         return false;
       }
     }
 
     // Check if peer is blacklisted in persistence
     if (knownPeer && knownPeer.blacklistUntil && knownPeer.blacklistUntil > Date.now()) {
-      console.log(`[AnnouncementManager] Peer ${peerId.substring(0, 8)} is blacklisted`);
       return false;
     }
 
@@ -498,8 +461,6 @@ class MeshAnnouncementManager {
     // Lexicographic comparison - lower ID initiates
     const shouldInitiate = ourPeerId < announcedPeerId;
 
-    console.log(`[AnnouncementManager] Tie-breaking: ${ourPeerId.substring(0, 8)} ${shouldInitiate ? '<' : '>'} ${announcedPeerId.substring(0, 8)} => ${shouldInitiate ? 'WE INITIATE' : 'THEY INITIATE'}`);
-
     return shouldInitiate;
   }
 
@@ -515,8 +476,6 @@ class MeshAnnouncementManager {
    */
   async initiateReconnection(peerId, displayName, connectionHint = null) {
     try {
-      console.log(`[AnnouncementManager] Initiating reconnection to ${displayName} (${peerId.substring(0, 8)})`);
-
       // Record attempt
       this.reconnectAttempts.set(peerId, Date.now());
       this.stats.reconnectionsInitiated++;
@@ -530,9 +489,6 @@ class MeshAnnouncementManager {
         await this.peerManager.reconnectToPeer(peerId, displayName, connectionHint);
       } else {
         // Fallback: Let the application handle reconnection via events
-        console.log(`[AnnouncementManager] Peer manager doesn't have reconnectToPeer method`);
-        console.log(`[AnnouncementManager] Application should implement reconnection for ${displayName}`);
-
         // Could emit an event here if the peer manager supports it
         if (this.peerManager.onReconnectionNeeded) {
           this.peerManager.onReconnectionNeeded(peerId, displayName, connectionHint);
@@ -587,10 +543,6 @@ class MeshAnnouncementManager {
         bestScore = score;
         bestPeer = peerId;
       }
-    }
-
-    if (bestPeer) {
-      console.log(`[AnnouncementManager] Best relay peer: ${bestPeer.substring(0, 8)} (score: ${bestScore.toFixed(1)})`);
     }
 
     return bestPeer;
@@ -685,8 +637,6 @@ class MeshAnnouncementManager {
     for (let i = 0; i < count && i < sorted.length; i++) {
       this.recentAnnouncements.delete(sorted[i][0]);
     }
-
-    console.log(`[AnnouncementManager] Pruned ${count} old announcements`);
   }
 
   /**
@@ -701,10 +651,6 @@ class MeshAnnouncementManager {
         this.recentAnnouncements.delete(peerId);
         cleaned++;
       }
-    }
-
-    if (cleaned > 0) {
-      console.log(`[AnnouncementManager] Cleaned ${cleaned} expired announcements`);
     }
   }
 
@@ -748,8 +694,6 @@ class MeshAnnouncementManager {
 
     this.recentAnnouncements.clear();
     this.reconnectAttempts.clear();
-
-    console.log('[AnnouncementManager] Destroyed');
   }
 }
 

@@ -37,13 +37,10 @@ class PeerIntroductionManager {
 
     const introId = `${peerBId}-${peerCId}-${Date.now()}`;
 
-    console.log(`[Intro] Introducing ${peerBId.substring(0, 8)} to ${peerCId.substring(0, 8)}`);
-
     const peerBData = this.peerManager.peers.get(peerBId);
     const peerCData = this.peerManager.peers.get(peerCId);
 
     if (!peerBData || !peerCData) {
-      console.warn('[Intro] One or both peers not found');
       return false;
     }
 
@@ -126,11 +123,8 @@ class PeerIntroductionManager {
       connectionQuality
     } = message.payload;
 
-    console.log(`[Intro] Received introduction to ${introducedName} (${introducedPeerId.substring(0, 8)})`);
-
     // Don't process same introduction twice
     if (this.introductionsReceived.has(introductionId)) {
-      console.log('[Intro] Already processed this introduction');
       return;
     }
 
@@ -144,26 +138,22 @@ class PeerIntroductionManager {
 
     // Check if we should accept this introduction
     if (!this.shouldAcceptIntroduction(introducedPeerId, connectionQuality)) {
-      console.log(`[Intro] Declining introduction to ${introducedPeerId.substring(0, 8)}`);
       return;
     }
 
     // Check if we're already connected
     if (this.peerManager.peers.has(introducedPeerId)) {
-      console.log(`[Intro] Already connected to ${introducedPeerId.substring(0, 8)}`);
       return;
     }
 
     // Use deterministic tie-breaking to decide who initiates
     if (this.identity.uuid < introducedPeerId) {
       // We initiate
-      console.log(`[Intro] We initiate connection to ${introducedName}`);
       setTimeout(() => {
         this.initiateConnection(introducedPeerId, introducedName, introductionId);
       }, 1000);
     } else {
       // Wait for them to initiate
-      console.log(`[Intro] Waiting for ${introducedName} to initiate`);
       this.pendingConnections.set(introducedPeerId, {
         name: introducedName,
         timestamp: Date.now(),
@@ -187,13 +177,11 @@ class PeerIntroductionManager {
     // At max connections?
     const currentCount = this.peerManager.getConnectedPeerCount();
     if (currentCount >= this.maxConnections) {
-      console.log(`[Intro] At max connections (${currentCount}/${this.maxConnections})`);
       return false;
     }
 
     // Connection quality threshold
     if (connectionQuality && connectionQuality.latency > 2000) {
-      console.log('[Intro] Peer latency too high');
       return false;
     }
 
@@ -202,21 +190,12 @@ class PeerIntroductionManager {
 
   async initiateConnection(peerId, peerName, introId) {
     if (this.peerManager.peers.has(peerId)) {
-      console.log(`[Intro] Already connected to ${peerId.substring(0, 8)}`);
       return;
     }
 
-    console.log(`[Intro] Creating connection to ${peerName}...`);
-
     // Create the connection through mesh manager
     // This will be handled by mesh.js's createPeerConnection method
-    const success = await this.peerManager.createIntroducedConnection(peerId, peerName, introId);
-
-    if (success) {
-      console.log(`[Intro] Successfully initiated connection to ${peerName}`);
-    } else {
-      console.warn(`[Intro] Failed to initiate connection to ${peerName}`);
-    }
+    await this.peerManager.createIntroducedConnection(peerId, peerName, introId);
   }
 
   // Handle relay signal (offer/answer through intermediary)
@@ -229,12 +208,9 @@ class PeerIntroductionManager {
       introductionId
     } = message.payload;
 
-    console.log(`[Intro] Received ${signalType} from ${fromName} (${fromPeerId.substring(0, 8)})`);
-
     // Are we expecting this?
     const pending = this.pendingConnections.get(fromPeerId);
     if (!pending) {
-      console.warn(`[Intro] Unexpected signal from ${fromPeerId.substring(0, 8)}`);
       // Still try to handle it
     }
 

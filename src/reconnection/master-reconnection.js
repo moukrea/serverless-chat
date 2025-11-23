@@ -191,10 +191,6 @@ class MasterReconnectionStrategy {
 
     // Optional: MeshTopologyManager (future feature)
     this.topology = null;
-    // If topology manager exists, it would be initialized here:
-    // if (typeof MeshTopologyManager !== 'undefined') {
-    //   this.topology = new MeshTopologyManager(identity, router, peerManager);
-    // }
 
     // Statistics tracking
     this.stats = {
@@ -218,8 +214,6 @@ class MasterReconnectionStrategy {
     this.isReconnecting = false;
     this.lastReconnectionResult = null;
     this.periodicReconnectTimer = null;
-
-    console.log('[MasterReconnection] Initialized with all child managers');
   }
 
   // ===========================================================================
@@ -247,7 +241,6 @@ class MasterReconnectionStrategy {
    */
   async reconnectToMesh() {
     if (this.isReconnecting) {
-      console.warn('[MasterReconnection] Reconnection already in progress');
       return {
         success: false,
         method: 'concurrent_attempt_blocked',
@@ -259,10 +252,6 @@ class MasterReconnectionStrategy {
 
     this.isReconnecting = true;
     this.stats.totalAttempts++;
-
-    console.log('═════════════════════════════════════');
-    console.log('🔄 MESH RECONNECTION INITIATED');
-    console.log('═════════════════════════════════════');
 
     const startTime = Date.now();
     const results = {
@@ -281,9 +270,6 @@ class MasterReconnectionStrategy {
       // SCENARIO 1: COLD START (0 Active Connections)
       // =====================================================================
       if (currentConnections === 0) {
-        console.log('❄️  COLD START: No active connections detected');
-        console.log('    Initiating multi-layer recovery protocol...');
-
         this.stats.coldStarts++;
         results.attempts.push('cold_start');
 
@@ -300,9 +286,6 @@ class MasterReconnectionStrategy {
 
           // Once we have warm connection, run post-reconnection setup
           await this.postReconnectionSetup();
-
-          console.log('✅ Cold start successful via', results.method);
-          console.log(`   Connected to ${results.peersConnected} peer(s) in ${results.duration}ms`);
         } else {
           // Cold start failed completely
           results.success = false;
@@ -313,10 +296,7 @@ class MasterReconnectionStrategy {
           this.stats.failedReconnections++;
           this.stats.methodBreakdown.failed++;
 
-          console.warn('❌ Cold start failed, manual intervention may be required');
-
           if (this.config.COLD_START.AUTO_FALLBACK && coldResult.fallbackRequired) {
-            console.log('   Triggering fallback to initial pairing...');
             await this.coldStart.fallbackToInitialPairing();
           }
         }
@@ -330,13 +310,9 @@ class MasterReconnectionStrategy {
       // =====================================================================
       // SCENARIO 2: WARM START (Has Active Connections)
       // =====================================================================
-      console.log(`🌡️  WARM START: ${currentConnections} active connection(s) detected`);
-      console.log('    Using mesh network for reconnection...');
-
       this.stats.warmStarts++;
 
       // Step 1: Announce our presence to the mesh
-      console.log('\n[Step 1/4] Announcing presence to mesh...');
       results.attempts.push('announcement');
 
       await new Promise(resolve =>
@@ -344,11 +320,9 @@ class MasterReconnectionStrategy {
       );
 
       await this.announcements.announcePresence('rejoin');
-      console.log('   ✓ Presence announced');
 
       // Step 2: Optional topology discovery
       if (this.topology && this.config.WARM_START.ENABLE_TOPOLOGY_DISCOVERY) {
-        console.log('[Step 2/4] Discovering mesh topology...');
         results.attempts.push('topology_discovery');
 
         try {
@@ -360,20 +334,15 @@ class MasterReconnectionStrategy {
               )
             ),
           ]);
-          console.log('   ✓ Topology discovered');
         } catch (error) {
-          console.log('   ⚠ Topology discovery failed or timed out (non-critical)');
+          // Topology discovery failed (non-critical)
         }
-      } else {
-        console.log('[Step 2/4] Topology discovery disabled, skipping...');
       }
 
       // Step 3: Get desired peers for reconnection
-      console.log('[Step 3/4] Identifying reconnection candidates...');
       const desiredPeers = await this.getDesiredPeers();
 
       if (desiredPeers.length === 0) {
-        console.log('   No peers available for reconnection');
         results.success = true;
         results.method = 'warm_reconnection';
         results.peersConnected = currentConnections;
@@ -385,13 +354,7 @@ class MasterReconnectionStrategy {
         return results;
       }
 
-      console.log(`   Found ${desiredPeers.length} reconnection candidate(s):`);
-      desiredPeers.slice(0, 5).forEach((peer, idx) => {
-        console.log(`   ${idx + 1}. ${peer.displayName} (${peer.peerId.substring(0, 8)}...)`);
-      });
-
       // Step 4: Reconnect to peers using cascading fallback
-      console.log(`[Step 4/4] Reconnecting to peers...`);
       results.attempts.push('peer_reconnection');
 
       let reconnectedCount = 0;
@@ -405,17 +368,13 @@ class MasterReconnectionStrategy {
 
         // Skip if already connected
         if (this.peerManager.peers.has(peer.peerId)) {
-          console.log(`   ⏭  ${peer.displayName} already connected, skipping`);
           continue;
         }
-
-        console.log(`\n   🔗 [${i + 1}/${maxPeers}] Reconnecting to ${peer.displayName}...`);
 
         const peerResult = await this.reconnectToPeer(peer);
 
         if (peerResult.success) {
           reconnectedCount++;
-          console.log(`      ✅ Success via ${peerResult.method} (${peerResult.duration}ms)`);
 
           // Track which method succeeded
           if (this.stats.methodBreakdown[peerResult.method] !== undefined) {
@@ -425,11 +384,8 @@ class MasterReconnectionStrategy {
           // Early exit if threshold reached
           if (this.config.WARM_START.EARLY_EXIT_THRESHOLD &&
               reconnectedCount >= this.config.WARM_START.EARLY_EXIT_THRESHOLD) {
-            console.log(`   ⚡ Early exit: reached ${reconnectedCount} connections`);
             break;
           }
-        } else {
-          console.log(`      ❌ Failed: ${peerResult.reason}`);
         }
       }
 
@@ -442,13 +398,6 @@ class MasterReconnectionStrategy {
       if (reconnectedCount > 0) {
         this.stats.successfulReconnections++;
       }
-
-      console.log('\n═════════════════════════════════════');
-      console.log('✅ RECONNECTION COMPLETE');
-      console.log(`   New connections: ${reconnectedCount}/${maxPeers}`);
-      console.log(`   Total time: ${results.duration}ms`);
-      console.log(`   Method: ${results.method}`);
-      console.log('═════════════════════════════════════');
 
     } catch (error) {
       console.error('[MasterReconnection] Unexpected error:', error);
@@ -519,13 +468,10 @@ class MasterReconnectionStrategy {
 
     // Try each strategy in sequence
     for (const strategy of strategies) {
-      console.log(`      → Trying ${strategy.name}...`);
-
       const strategyStartTime = Date.now();
 
       try {
         const result = await strategy.fn();
-        const duration = Date.now() - strategyStartTime;
 
         if (result.success) {
           return {
@@ -535,16 +481,12 @@ class MasterReconnectionStrategy {
           };
         }
 
-        console.log(`        ✗ ${strategy.name} failed: ${result.reason || 'unknown'} (${duration}ms)`);
-
       } catch (error) {
-        const duration = Date.now() - strategyStartTime;
-        console.log(`        ✗ ${strategy.name} error: ${error.message} (${duration}ms)`);
+        // Strategy failed, continue to next
       }
 
       // Check if we've exceeded total time budget
       if (Date.now() - startTime >= this.config.TIMEOUTS.TOTAL_PER_PEER) {
-        console.log(`        ⏱ Time budget exceeded for ${peer.displayName}`);
         break;
       }
     }
@@ -577,22 +519,12 @@ class MasterReconnectionStrategy {
    * });
    */
   async handleIpChange() {
-    console.log('═════════════════════════════════════');
-    console.log('🔄 IP ADDRESS CHANGED');
-    console.log('═════════════════════════════════════');
-
     try {
       // Announce IP change with cryptographic proof
-      console.log('   Broadcasting IP change announcement...');
       await this.announcements.announceIpChange();
 
       // Give mesh time to propagate announcement
-      console.log('   Waiting for mesh propagation (3s)...');
       await new Promise(resolve => setTimeout(resolve, 3000));
-
-      console.log('✅ IP change announced successfully');
-      console.log('   Waiting for peer reconnections...');
-      console.log('═════════════════════════════════════');
 
       return true;
 
@@ -632,16 +564,11 @@ class MasterReconnectionStrategy {
       });
 
       if (candidates.length === 0) {
-        console.log('[MasterReconnection] No quality candidates found in persistence');
         return [];
       }
 
       // Extract peer objects from candidates
-      const peers = candidates.map(c => c.peer);
-
-      console.log(`[MasterReconnection] Selected ${peers.length} reconnection candidates`);
-
-      return peers;
+      return candidates.map(c => c.peer);
 
     } catch (error) {
       console.error('[MasterReconnection] Error getting desired peers:', error);
@@ -665,21 +592,17 @@ class MasterReconnectionStrategy {
    * @returns {Promise<void>}
    */
   async postReconnectionSetup() {
-    console.log('[MasterReconnection] Running post-reconnection setup...');
-
     try {
       // Start periodic announcements (heartbeat)
       if (this.config.POST_RECONNECTION.ENABLE_PERIODIC_ANNOUNCEMENTS) {
         this.announcements.startPeriodicAnnouncements();
-        console.log('   ✓ Started periodic announcements');
       }
 
       // Discover mesh topology (optional)
       if (this.topology && this.config.POST_RECONNECTION.ENABLE_TOPOLOGY_DISCOVERY) {
         await this.topology.discoverTopology().catch(() => {
-          console.log('   ⚠ Topology discovery failed (non-critical)');
+          // Topology discovery failed (non-critical)
         });
-        console.log('   ✓ Topology discovery initiated');
       }
 
       // Update peer persistence
@@ -693,16 +616,12 @@ class MasterReconnectionStrategy {
             await this.peerPersistence.updateLastSeen(peerId);
           }
         }
-        console.log('   ✓ Updated peer persistence records');
       }
 
       // Start periodic reconnection attempts
       if (this.config.POST_RECONNECTION.ENABLE_PERIODIC_RECONNECTION) {
         this.startPeriodicReconnection();
-        console.log('   ✓ Started periodic reconnection');
       }
-
-      console.log('[MasterReconnection] Post-reconnection setup complete');
 
     } catch (error) {
       console.error('[MasterReconnection] Post-reconnection setup error:', error);
@@ -722,12 +641,10 @@ class MasterReconnectionStrategy {
    */
   startPeriodicReconnection() {
     if (this.periodicReconnectTimer) {
-      console.log('[MasterReconnection] Periodic reconnection already running');
       return;
     }
 
     const interval = this.config.PERIODIC_RECONNECTION.INTERVAL;
-    console.log(`[MasterReconnection] Starting periodic reconnection (every ${interval / 1000}s)`);
 
     this.periodicReconnectTimer = setInterval(async () => {
       try {
@@ -742,8 +659,6 @@ class MasterReconnectionStrategy {
           return;
         }
 
-        console.log('[MasterReconnection] Running periodic reconnection check...');
-
         // Get disconnected peers worth reconnecting to
         const desiredPeers = await this.getDesiredPeers();
         const disconnectedPeers = desiredPeers.filter(peer =>
@@ -751,7 +666,6 @@ class MasterReconnectionStrategy {
         );
 
         if (disconnectedPeers.length === 0) {
-          console.log('[MasterReconnection] No disconnected peers to reconnect');
           return;
         }
 
@@ -760,8 +674,6 @@ class MasterReconnectionStrategy {
           disconnectedPeers.length,
           this.config.PERIODIC_RECONNECTION.MAX_ATTEMPTS_PER_CYCLE
         );
-
-        console.log(`[MasterReconnection] Attempting to reconnect to ${maxAttempts} peer(s)...`);
 
         let successCount = 0;
         for (let i = 0; i < maxAttempts; i++) {
@@ -772,18 +684,12 @@ class MasterReconnectionStrategy {
             continue;
           }
 
-          console.log(`   [${i + 1}/${maxAttempts}] Trying ${peer.displayName}...`);
           const result = await this.reconnectToPeer(peer);
 
           if (result.success) {
             successCount++;
-            console.log(`      ✓ Connected via ${result.method}`);
-          } else {
-            console.log(`      ✗ Failed: ${result.reason}`);
           }
         }
-
-        console.log(`[MasterReconnection] Periodic reconnection complete: ${successCount}/${maxAttempts} successful`);
 
       } catch (error) {
         console.error('[MasterReconnection] Periodic reconnection error:', error);
@@ -799,7 +705,6 @@ class MasterReconnectionStrategy {
     if (this.periodicReconnectTimer) {
       clearInterval(this.periodicReconnectTimer);
       this.periodicReconnectTimer = null;
-      console.log('[MasterReconnection] Stopped periodic reconnection');
     }
   }
 
@@ -930,8 +835,6 @@ class MasterReconnectionStrategy {
    * });
    */
   destroy() {
-    console.log('[MasterReconnection] Cleaning up reconnection system...');
-
     try {
       // Stop periodic reconnection
       this.stopPeriodicReconnection();
@@ -958,8 +861,6 @@ class MasterReconnectionStrategy {
       if (typeof this.directReconnect.stopMonitoring === 'function') {
         this.directReconnect.stopMonitoring();
       }
-
-      console.log('[MasterReconnection] Cleanup complete');
 
     } catch (error) {
       console.error('[MasterReconnection] Error during cleanup:', error);

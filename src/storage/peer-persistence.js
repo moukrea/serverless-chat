@@ -233,8 +233,6 @@ class PeerPersistenceManager {
     await this.checkAndMigrate();
     await this.loadMetadata();
     this.initialized = true;
-
-    console.log('[PeerPersistence] Initialized');
   }
 
   // ===========================================================================
@@ -386,7 +384,6 @@ class PeerPersistenceManager {
     if (!hasSuccessfulHistory &&
         peer.reconnectionAttempts >= STORAGE_CONFIG.RETENTION.FAILED_ATTEMPTS) {
       peer.blacklistUntil = Date.now() + STORAGE_CONFIG.RETENTION.BLACKLIST_DURATION;
-      console.log(`[PeerPersistence] Blacklisted peer ${peerId.substring(0, 8)} until ${new Date(peer.blacklistUntil).toLocaleString()}`);
     }
 
     return await this.storePeer(peer);
@@ -675,8 +672,6 @@ class PeerPersistenceManager {
     const peerIds = await this.getAllPeerIds();
     let removed = 0;
 
-    console.log(`[PeerPersistence] Cleanup: checking ${peerIds.length} peers`);
-
     for (const peerId of peerIds) {
       const peer = await this.getPeer(peerId);
       if (!peer) continue;
@@ -702,7 +697,6 @@ class PeerPersistenceManager {
       if (shouldRemove) {
         await this.removePeer(peerId);
         removed++;
-        console.log(`[PeerPersistence] Removed peer ${peerId.substring(0, 8)} (${reason})`);
       }
     }
 
@@ -716,7 +710,6 @@ class PeerPersistenceManager {
 
     await this.updateMetadata({ lastCleanup: now });
 
-    console.log(`[PeerPersistence] Cleanup complete: removed ${removed} peers`);
     return removed;
   }
 
@@ -936,12 +929,10 @@ class PeerPersistenceManager {
         STORAGE_CONFIG.KEYS.SCHEMA_VERSION,
         STORAGE_CONFIG.CURRENT_VERSION
       );
-      console.log('[PeerPersistence] Initialized schema version:', STORAGE_CONFIG.CURRENT_VERSION);
       return;
     }
 
     if (currentVersion !== STORAGE_CONFIG.CURRENT_VERSION) {
-      console.log(`[PeerPersistence] Migrating from ${currentVersion} to ${STORAGE_CONFIG.CURRENT_VERSION}`);
       await this.migrate(currentVersion, STORAGE_CONFIG.CURRENT_VERSION);
     }
   }
@@ -953,8 +944,6 @@ class PeerPersistenceManager {
    */
   async migrate(fromVersion, toVersion) {
     // Add migration logic here for future schema changes
-    console.log(`[PeerPersistence] Migration from ${fromVersion} to ${toVersion} - no changes needed`);
-
     localStorage.setItem(
       STORAGE_CONFIG.KEYS.SCHEMA_VERSION,
       toVersion
@@ -980,8 +969,6 @@ class PeerPersistenceManager {
     localStorage.removeItem(STORAGE_CONFIG.KEYS.METADATA);
 
     encryption.clearKey();
-
-    console.log('[PeerPersistence] Cleared all data');
   }
 
   /**
@@ -1017,10 +1004,6 @@ class PeerPersistenceManager {
    * @returns {Promise<number>} Number of peers imported
    */
   async importData(data) {
-    if (data.version !== STORAGE_CONFIG.CURRENT_VERSION) {
-      console.warn('[PeerPersistence] Import version mismatch');
-    }
-
     let imported = 0;
 
     for (const peer of data.peers) {
@@ -1032,7 +1015,6 @@ class PeerPersistenceManager {
       }
     }
 
-    console.log(`[PeerPersistence] Imported ${imported} peers`);
     return imported;
   }
 }

@@ -65,7 +65,6 @@ class LatencyManager {
     // Cleanup timeout
     setTimeout(() => {
       if (this.pendingPings.has(pingId)) {
-        console.log(`[Latency] Ping ${pingId} to ${peerId.substring(0, 8)} timed out`);
         this.pendingPings.delete(pingId);
       }
     }, this.pingTimeout);
@@ -122,7 +121,6 @@ class LatencyManager {
         // Multi-hop, estimate
         peerData.latency = Math.floor(latency / hopCount);
       }
-      console.log(`[Latency] ${peerId.substring(0, 8)}: ${latency}ms (${hopCount} hops)`);
     }
   }
 
