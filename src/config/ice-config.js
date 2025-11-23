@@ -206,8 +206,9 @@ export const ICE_CONFIG = {
    * Pre-gather ICE candidates to speed up connection establishment
    * Higher values = faster connections but more resources
    * Range: 0-10, Default: 0
+   * Set to 0 when using trickle: false to avoid duplicate candidates
    */
-  iceCandidatePoolSize: 10,
+  iceCandidatePoolSize: 0,
 
   /**
    * Bundle Policy

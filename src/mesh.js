@@ -216,6 +216,7 @@ class MeshNetwork {
         initiator: true,
         trickle: false,
         config: ICE_CONFIG, // Use centralized ICE configuration
+        sdpTransform: (sdp) => sdp.replace(/a=ice-options:trickle\s?\n/g, ''),
       });
 
       peer.on('signal', (data) => {
@@ -251,6 +252,7 @@ class MeshNetwork {
           initiator: false,
           trickle: false,
           config: ICE_CONFIG, // Use centralized ICE configuration
+          sdpTransform: (sdp) => sdp.replace(/a=ice-options:trickle\s?\n/g, ''),
         });
 
         peer.on('signal', (answerSignal) => {
@@ -343,6 +345,7 @@ class MeshNetwork {
       initiator: true,
       trickle: false,
       config: ICE_CONFIG, // Use centralized ICE configuration
+      sdpTransform: (sdp) => sdp.replace(/a=ice-options:trickle\s?\n/g, ''),
     });
 
     // Wait for signal
@@ -382,6 +385,7 @@ class MeshNetwork {
         initiator: false,
         trickle: false,
         config: ICE_CONFIG, // Use centralized ICE configuration
+        sdpTransform: (sdp) => sdp.replace(/a=ice-options:trickle\s?\n/g, ''),
       });
 
       peer.on('signal', (answerSignal) => {
@@ -616,7 +620,8 @@ class MeshNetwork {
       const reconnectPeer = new SimplePeer({
         initiator: true,
         trickle: false,
-        config: ICE_CONFIG
+        config: ICE_CONFIG,
+        sdpTransform: (sdp) => sdp.replace(/a=ice-options:trickle\s?\n/g, ''),
       });
 
       // Wait for the offer signal
@@ -665,7 +670,8 @@ class MeshNetwork {
       const reconnectPeer = new SimplePeer({
         initiator: false,
         trickle: false,
-        config: ICE_CONFIG
+        config: ICE_CONFIG,
+        sdpTransform: (sdp) => sdp.replace(/a=ice-options:trickle\s?\n/g, ''),
       });
 
       // Wait for the answer signal

@@ -1,5 +1,6 @@
 import { defineConfig } from 'vite';
 import { VitePWA } from 'vite-plugin-pwa';
+import { nodePolyfills } from 'vite-plugin-node-polyfills';
 
 export default defineConfig({
   base: '/serverless-chat/',
@@ -11,16 +12,15 @@ export default defineConfig({
     port: 3000,
     open: true,
   },
-  resolve: {
-    alias: {
-      process: 'process/browser',
-    },
-  },
-  define: {
-    'process.env': {},
-    'global': 'globalThis',
-  },
   plugins: [
+    nodePolyfills({
+      globals: {
+        Buffer: true,
+        global: true,
+        process: true,
+      },
+      protocolImports: true,
+    }),
     VitePWA({
       registerType: 'autoUpdate',
       includeAssets: ['icon.svg', 'robots.txt'],

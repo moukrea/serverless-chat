@@ -21,6 +21,7 @@
     "@playwright/test": "^1.56.1",
     "sharp": "^0.34.5",
     "vite": "^5.0.0",
+    "vite-plugin-node-polyfills": "^0.24.0",
     "vite-plugin-pwa": "^1.1.0",
     "workbox-window": "^7.4.0"
   }

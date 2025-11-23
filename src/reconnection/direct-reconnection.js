@@ -289,6 +289,7 @@ class DirectReconnectionManager {
           initiator: wasInitiator,
           trickle: false,  // Disable trickle for faster gathering
           config: ICE_CONFIG,
+          sdpTransform: (sdp) => sdp.replace(/a=ice-options:trickle\s?\n/g, ''),
         });
 
         // Set timeout
@@ -410,6 +411,7 @@ class DirectReconnectionManager {
           initiator,
           trickle: false,
           config: ICE_CONFIG,
+          sdpTransform: (sdp) => sdp.replace(/a=ice-options:trickle\s?\n/g, ''),
         });
 
         // Set timeout
