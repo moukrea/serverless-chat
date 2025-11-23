@@ -421,28 +421,27 @@ class MeshNetwork {
 
   _setupPeerHandlers(peer, knownUUID = null) {
     // Monitor ICE connection state for early disconnection detection
-    if (peer._pc) {
-      const originalOnIceConnectionStateChange = peer._pc.oniceconnectionstatechange;
-      peer._pc.oniceconnectionstatechange = () => {
-        if (originalOnIceConnectionStateChange) {
-          originalOnIceConnectionStateChange.call(peer._pc);
-        }
+    // Use addEventListener to avoid interfering with SimplePeer's internal handlers
+    // Defer setup until after SimplePeer initialization is complete
+    peer.once('connect', () => {
+      if (peer._pc) {
+        peer._pc.addEventListener('iceconnectionstatechange', () => {
+          const uuid = knownUUID || peer._peerUUID;
+          const iceState = peer._pc.iceConnectionState;
 
-        const uuid = knownUUID || peer._peerUUID;
-        const iceState = peer._pc.iceConnectionState;
-
-        if (uuid && iceState === 'disconnected') {
-          // Connection interrupted, trigger immediate reconnection attempt
-          if (this.reconnectionEnabled && this.masterReconnect) {
-            setTimeout(() => {
-              if (peer._pc && peer._pc.iceConnectionState === 'disconnected') {
-                this.masterReconnect.handlePeerDisconnected(uuid);
-              }
-            }, 3000); // Wait 3s to see if connection recovers
+          if (uuid && iceState === 'disconnected') {
+            // Connection interrupted, trigger immediate reconnection attempt
+            if (this.reconnectionEnabled && this.masterReconnect) {
+              setTimeout(() => {
+                if (peer._pc && peer._pc.iceConnectionState === 'disconnected') {
+                  this.masterReconnect.handlePeerDisconnected(uuid);
+                }
+              }, 3000); // Wait 3s to see if connection recovers
+            }
           }
-        }
-      };
-    }
+        });
+      }
+    });
 
     peer.on('connect', async () => {
       const uuid = knownUUID || peer._peerUUID;
