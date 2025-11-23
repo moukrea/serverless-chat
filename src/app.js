@@ -927,6 +927,9 @@ async function initializeReconnection() {
       return;
     }
 
+    // Show reconnection progress
+    addMessage('Reconnecting to mesh network...', 'system');
+
     // Attempt reconnection
     const reconnectStart = Date.now();
     const result = await mesh.reconnectToMesh();
@@ -939,7 +942,18 @@ async function initializeReconnection() {
     } else if (result.peersConnected > 0) {
       // Successfully reconnected
       const totalTime = Date.now() - startTime;
-      addMessage(`Reconnected to ${result.peersConnected} peer(s) automatically!`, 'system');
+      const timeStr = reconnectTime < 1000 ? `${reconnectTime}ms` : `${(reconnectTime / 1000).toFixed(1)}s`;
+
+      let methodStr = '';
+      if (result.method === 'mesh_relay' || result.method === 'warm_reconnection') {
+        methodStr = ' via mesh relay';
+      } else if (result.method === 'direct_cached') {
+        methodStr = ' directly';
+      } else if (result.method === 'cold_start') {
+        methodStr = ' from cold start';
+      }
+
+      addMessage(`Reconnected to ${result.peersConnected} peer(s)${methodStr} (${timeStr})`, 'system');
 
       // Enable UI
       $('messageInput').disabled = false;

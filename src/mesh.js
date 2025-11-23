@@ -420,6 +420,30 @@ class MeshNetwork {
   }
 
   _setupPeerHandlers(peer, knownUUID = null) {
+    // Monitor ICE connection state for early disconnection detection
+    if (peer._pc) {
+      const originalOnIceConnectionStateChange = peer._pc.oniceconnectionstatechange;
+      peer._pc.oniceconnectionstatechange = () => {
+        if (originalOnIceConnectionStateChange) {
+          originalOnIceConnectionStateChange.call(peer._pc);
+        }
+
+        const uuid = knownUUID || peer._peerUUID;
+        const iceState = peer._pc.iceConnectionState;
+
+        if (uuid && iceState === 'disconnected') {
+          // Connection interrupted, trigger immediate reconnection attempt
+          if (this.reconnectionEnabled && this.masterReconnect) {
+            setTimeout(() => {
+              if (peer._pc && peer._pc.iceConnectionState === 'disconnected') {
+                this.masterReconnect.handlePeerDisconnected(uuid);
+              }
+            }, 3000); // Wait 3s to see if connection recovers
+          }
+        }
+      };
+    }
+
     peer.on('connect', async () => {
       const uuid = knownUUID || peer._peerUUID;
       if (uuid && this.peers.has(uuid)) {
@@ -809,6 +833,33 @@ class MeshNetwork {
       return result;
     } catch (error) {
       console.error('[Mesh] Reconnection failed:', error);
+      return { success: false, reason: 'exception', error };
+    }
+  }
+
+  // Reconnect to specific peer (called by announcement manager)
+  async reconnectToPeer(peerId, displayName, connectionHint = null) {
+    // Wait for initialization if still pending
+    if (!this.reconnectionReady && this._initPromise) {
+      await this._initPromise;
+    }
+
+    if (!this.reconnectionEnabled || !this.masterReconnect) {
+      return { success: false, reason: 'disabled' };
+    }
+
+    // Check if already connected
+    const existingPeer = this.peers.get(peerId);
+    if (existingPeer && (existingPeer.status === 'connected' || existingPeer.status === 'connecting')) {
+      return { success: false, reason: 'already_connected' };
+    }
+
+    try {
+      // Attempt mesh relay reconnection immediately
+      const result = await this.masterReconnect.meshReconnect.attemptReconnection(peerId, displayName, connectionHint);
+      return result;
+    } catch (error) {
+      console.error(`[Mesh] Failed to reconnect to peer ${peerId.substring(0, 8)}:`, error);
       return { success: false, reason: 'exception', error };
     }
   }

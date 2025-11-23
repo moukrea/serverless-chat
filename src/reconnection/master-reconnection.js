@@ -41,13 +41,13 @@
  *    ├─ Discover topology (optional)
  *    ├─ Get desired peers from persistence
  *    └─ For each peer:
- *       ├─ Try direct reconnection (8s timeout)
+ *       ├─ Try direct reconnection (2s timeout)
  *       ├─ Try mesh relay (20s timeout)
  *       └─ Move to next peer
  *
  * Cascading Fallback Strategy (per peer):
  * ═══════════════════════════════════════════════════════════════
- * 1. Direct (cached ICE)     →  8s timeout  →  5-20% success
+ * 1. Direct (cached ICE)     →  2s timeout  →  5-20% success (fast-path)
  * 2. Mesh Relay (gossip)     → 20s timeout  → 70-80% success
  *
  * @module reconnection/master-reconnection
@@ -65,9 +65,9 @@ import ColdStartManager from './cold-start.js';
 export const MASTER_RECONNECTION_CONFIG = {
   // Strategy timeouts (per peer)
   TIMEOUTS: {
-    DIRECT: 8000,           // 8 seconds for direct reconnection
+    DIRECT: 2000,           // 2 seconds for direct reconnection (fast-path only)
     MESH_RELAY: 20000,      // 20 seconds for mesh relay
-    TOTAL_PER_PEER: 30000,  // 30 seconds total per peer
+    TOTAL_PER_PEER: 22000,  // 22 seconds total per peer (reduced from 30s)
   },
 
   // Warm start settings
@@ -497,6 +497,64 @@ class MasterReconnectionStrategy {
       reason: 'all_strategies_failed',
       duration: Date.now() - startTime,
     };
+  }
+
+  // ===========================================================================
+  // PEER DISCONNECTION HANDLING
+  // ===========================================================================
+
+  /**
+   * Handle peer disconnection event
+   *
+   * Called when ICE connection state transitions to 'disconnected'.
+   * Attempts immediate reconnection via mesh relay.
+   *
+   * @param {string} peerId - Peer ID that disconnected
+   * @returns {Promise<void>}
+   *
+   * @example
+   * // Called from mesh.js ICE connection state monitor
+   * masterReconnect.handlePeerDisconnected('abc-123-def');
+   */
+  async handlePeerDisconnected(peerId) {
+    try {
+      // Get peer info from persistence
+      const peerInfo = await this.peerPersistence.getPeer(peerId);
+      if (!peerInfo) {
+        return;
+      }
+
+      // Wait a moment for automatic ICE recovery (may reconnect on its own)
+      await new Promise(resolve => setTimeout(resolve, 1000));
+
+      // Check if peer is still disconnected
+      const currentPeer = this.peerManager.peers.get(peerId);
+      if (currentPeer && currentPeer.status === 'connected') {
+        return; // Recovered on its own
+      }
+
+      // Remove the disconnected peer from peer manager
+      if (currentPeer) {
+        if (currentPeer.peer && !currentPeer.peer.destroyed) {
+          currentPeer.peer.destroy();
+        }
+        this.peerManager.peers.delete(peerId);
+      }
+
+      // Attempt mesh relay reconnection immediately
+      const result = await this.meshReconnect.reconnectViaMesh(
+        peerId,
+        peerInfo.displayName
+      );
+
+      if (!result.success) {
+        // Record failed attempt
+        await this.peerPersistence.incrementReconnectionAttempts(peerId);
+      }
+
+    } catch (error) {
+      console.error(`[MasterReconnection] Error handling peer disconnection for ${peerId.substring(0, 8)}:`, error);
+    }
   }
 
   // ===========================================================================

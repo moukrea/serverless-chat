@@ -555,6 +555,34 @@ class ReconnectionManager {
 
     this.stats.offersReceived++;
 
+    // Perfect negotiation: Check for collision (both peers trying to reconnect)
+    const ourPendingOffer = Array.from(this.pendingReconnects.values())
+      .find(pending => pending.targetPeerId === requesterPeerId);
+
+    if (ourPendingOffer) {
+      // Collision detected - both peers sent offers
+      // Use deterministic tie-breaking: polite peer (higher UUID) rolls back
+      const weArePolite = this.identity.uuid > requesterPeerId;
+
+      if (weArePolite) {
+        // Roll back our offer and accept theirs
+        ourPendingOffer.peer.destroy();
+        clearTimeout(ourPendingOffer.timeout);
+
+        // Find and delete our pending reconnect by searching for the entry
+        for (const [id, pending] of this.pendingReconnects.entries()) {
+          if (pending === ourPendingOffer) {
+            this.pendingReconnects.delete(id);
+            break;
+          }
+        }
+      } else {
+        // We're impolite (lower UUID), proceed with our offer, ignore theirs
+        this.sendRejection(reconnectId, requesterPeerId, 'collision_detected');
+        return;
+      }
+    }
+
     // Check if we should accept
     if (!this.shouldAcceptReconnection(requesterPeerId)) {
       this.sendRejection(reconnectId, requesterPeerId, 'declined');
