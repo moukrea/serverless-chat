@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="Serverless peer-to-peer chat with mesh networking. No server required.">
+    <meta name="theme-color" content="#5865F2">
+
+    <!-- iOS meta tags -->
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="P2P Chat">
+
+    <title>P2P Mesh Chat</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css">
+    <link rel="icon" type="image/svg+xml" href="/serverless-chat/icon.svg">
+    <script type="module" crossorigin src="/serverless-chat/assets/index-7tjakr4O.js"></script>
+    <link rel="stylesheet" crossorigin href="/serverless-chat/assets/index-DnN5Gues.css">
+  <link rel="manifest" href="/serverless-chat/manifest.webmanifest"><script id="vite-plugin-pwa:register-sw" src="/serverless-chat/registerSW.js"></script></head>
+  <body>
+    <div class="container">
+      <!-- Sidebar (Left Panel) -->
+      <aside class="sidebar" id="sidebar">
+        <!-- App Header -->
+        <div class="sidebar-header">
+          <i class="ti ti-message-circle"></i>
+          <h1>P2P Mesh Chat</h1>
+          <button class="btn-close-sidebar" id="btnCloseSidebar" title="Close menu" aria-label="Close sidebar">
+            <i class="ti ti-x"></i>
+          </button>
+        </div>
+
+        <!-- User Identity -->
+        <div class="user-identity" id="userIdentity">
+          <div class="user-avatar" id="userAvatar">??</div>
+          <div class="user-info">
+            <div class="user-name" id="displayName">Loading...</div>
+            <div class="user-uuid" id="userUUID">...</div>
+          </div>
+          <button class="btn-edit-identity" id="btnEditName" title="Edit display name">
+            <i class="ti ti-edit"></i>
+          </button>
+        </div>
+
+        <!-- Peers Section -->
+        <div class="peers-section">
+          <div class="peers-header">
+            <i class="ti ti-users"></i>
+            <span>Peers</span>
+            <span class="peer-count" id="peerCount">0</span>
+          </div>
+          <div class="peers-list" id="peersList">
+            <div class="no-peers">No peers connected yet</div>
+          </div>
+        </div>
+
+        <!-- Connection Controls -->
+        <div class="connection-controls">
+          <button class="btn-install-app hidden" id="btnInstallApp"
+                  aria-label="Install P2P Mesh Chat as an app"
+                  title="Install app for offline access">
+            <i class="ti ti-download"></i>
+            <span>Install App</span>
+          </button>
+
+          <button class="btn-new-connection" id="btnNewConnection">
+            <i class="ti ti-plus"></i>
+            <span>New Connection</span>
+          </button>
+
+          <button class="btn-clear-data" id="btnClearData">
+            <i class="ti ti-trash"></i>
+            <span>Clear all data</span>
+          </button>
+        </div>
+      </aside>
+
+      <!-- Sidebar Overlay (Mobile) -->
+      <div class="sidebar-overlay" id="sidebarOverlay"></div>
+
+      <!-- Main Content (Right Panel) -->
+      <main class="main-content">
+        <!-- Top Bar -->
+        <div class="top-bar">
+          <button class="btn-mobile-menu hidden" id="btnMobileMenu">
+            <i class="ti ti-menu-2"></i>
+          </button>
+          <div class="top-bar-title">
+            <i class="ti ti-messages"></i>
+            <h2>Chat</h2>
+          </div>
+          <div class="top-bar-actions">
+            <button class="btn-theme-toggle" id="btnThemeToggle" title="Toggle theme">
+              <i class="ti ti-moon"></i>
+            </button>
+          </div>
+        </div>
+
+        <!-- Messages Area -->
+        <div class="messages-container" id="messages">
+          <!-- Messages will be added here dynamically -->
+        </div>
+
+        <!-- Message Input -->
+        <div class="message-input-container">
+          <div class="message-input-wrapper">
+            <textarea class="message-input" id="messageInput" placeholder="Type a message..." rows="1"></textarea>
+            <button class="btn-send" id="btnSend">
+              <i class="ti ti-send"></i>
+            </button>
+          </div>
+        </div>
+      </main>
+    </div>
+
+    <!-- Connection Modal -->
+    <div class="modal-overlay hidden" id="connectionModal">
+      <div class="modal">
+        <div class="modal-header">
+          <div class="modal-title">
+            <i class="ti ti-plug-connected"></i>
+            <span>Connect to Peer</span>
+          </div>
+          <button class="btn-close-modal" id="btnCloseModal">
+            <i class="ti ti-x"></i>
+          </button>
+        </div>
+        <div class="modal-body">
+          <!-- Initial Choice -->
+          <div id="connectionChoice">
+            <div class="modal-section">
+              <h3>Choose Connection Method</h3>
+              <div class="button-group">
+                <button id="btnInvite" class="btn-primary">
+                  <i class="ti ti-user-plus"></i>
+                  <span>Create Invitation</span>
+                </button>
+                <button id="btnJoin" class="btn-secondary">
+                  <i class="ti ti-login"></i>
+                  <span>Join with Code</span>
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Initiator Flow (Create Invitation) -->
+          <div id="initiatorFlow" class="hidden">
+            <div class="modal-section">
+              <h3>Step 1: Share Invitation Code</h3>
+              <div class="code-container">
+                <div id="offerLoader" class="loader">
+                  <div class="spinner"></div>
+                  <p>Generating invitation code...</p>
+                </div>
+                <textarea id="offerOutput" readonly class="hidden"></textarea>
+              </div>
+              <button id="btnCopyOffer" class="btn-secondary hidden">
+                <i class="ti ti-copy"></i>
+                <span>Copy Code</span>
+              </button>
+            </div>
+
+            <div class="modal-section">
+              <h3>Step 2: Paste Response Code</h3>
+              <textarea id="answerInput" placeholder="Paste the response code here..."></textarea>
+              <button id="btnAcceptAnswer" class="btn-primary">
+                <i class="ti ti-plug-connected"></i>
+                <span>Connect</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- Joiner Flow (Join with Code) -->
+          <div id="joinerFlow" class="hidden">
+            <div class="modal-section">
+              <h3>Step 1: Paste Invitation Code</h3>
+              <textarea id="offerInput" placeholder="Paste the invitation code here..."></textarea>
+              <button id="btnProcessOffer" class="btn-primary">
+                <i class="ti ti-key"></i>
+                <span>Generate Response</span>
+              </button>
+            </div>
+
+            <div id="joinerAnswerStep" class="hidden">
+              <div class="modal-section">
+                <h3>Step 2: Share Response Code</h3>
+                <div class="code-container">
+                  <div id="answerLoader" class="loader">
+                    <div class="spinner"></div>
+                    <p>Generating response code...</p>
+                  </div>
+                  <textarea id="answerOutput" readonly class="hidden"></textarea>
+                </div>
+                <button id="btnCopyAnswer" class="btn-secondary hidden">
+                  <i class="ti ti-copy"></i>
+                  <span>Copy Code</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </body>
+</html>

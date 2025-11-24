@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <defs>
+    <linearGradient id="grad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#5865F2;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#7C3AED;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+
+  <!-- Background circle -->
+  <circle cx="256" cy="256" r="240" fill="url(#grad)"/>
+
+  <!-- Message bubble -->
+  <path fill="#FFFFFF" d="M 156 186 C 156 163 174 144 196 144 L 316 144 C 338 144 356 163 356 186 L 356 266 C 356 288 338 306 316 306 L 276 306 L 236 346 L 236 306 L 196 306 C 174 306 156 288 156 266 Z"/>
+
+  <!-- Mesh network dots -->
+  <circle cx="216" cy="210" r="12" fill="#5865F2"/>
+  <circle cx="256" cy="210" r="12" fill="#5865F2"/>
+  <circle cx="296" cy="210" r="12" fill="#5865F2"/>
+
+  <!-- Connection lines -->
+  <line x1="216" y1="222" x2="256" y2="246" stroke="#5865F2" stroke-width="4" stroke-linecap="round"/>
+  <line x1="256" y1="222" x2="296" y2="246" stroke="#5865F2" stroke-width="4" stroke-linecap="round"/>
+  <line x1="228" y1="210" x2="244" y2="210" stroke="#5865F2" stroke-width="4" stroke-linecap="round"/>
+  <line x1="268" y1="210" x2="284" y2="210" stroke="#5865F2" stroke-width="4" stroke-linecap="round"/>
+
+  <!-- Bottom dots -->
+  <circle cx="236" cy="256" r="10" fill="#5865F2"/>
+  <circle cx="276" cy="256" r="10" fill="#5865F2"/>
+</svg>
