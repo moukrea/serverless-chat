@@ -938,7 +938,14 @@ async function initializeReconnection() {
     if (result.fallbackRequired || result.method === 'cold_start_failed') {
       // All automatic reconnection failed, show manual pairing UI
       const totalTime = Date.now() - startTime;
-      addMessage('No saved connections found. Click "New Connection" to connect.', 'system');
+      const timeStr = reconnectTime < 1000 ? `${reconnectTime}ms` : `${(reconnectTime / 1000).toFixed(1)}s`;
+
+      // Show more informative message about what happened
+      if (result.peersAttempted > 0) {
+        addMessage(`Reconnection failed: ${result.peersAttempted} saved peer(s) unreachable (${timeStr}). Click "New Connection" to connect.`, 'system');
+      } else {
+        addMessage('No saved connections found. Click "New Connection" to pair with peers.', 'system');
+      }
     } else if (result.peersConnected > 0) {
       // Successfully reconnected
       const totalTime = Date.now() - startTime;
@@ -961,7 +968,8 @@ async function initializeReconnection() {
     } else {
       // No peers to reconnect to
       const totalTime = Date.now() - startTime;
-      addMessage('No saved connections. Click "New Connection" to connect.', 'system');
+      const timeStr = reconnectTime < 1000 ? `${reconnectTime}ms` : `${(reconnectTime / 1000).toFixed(1)}s`;
+      addMessage(`Reconnection completed (${timeStr}): No peers available. Click "New Connection" to pair.`, 'system');
     }
   } catch (error) {
     const totalTime = Date.now() - startTime;

@@ -248,6 +248,35 @@ class MeshNetwork {
           return;
         }
 
+        // Store peer intent early (before connection completes)
+        // This ensures we have peer data even if user refreshes during signaling
+        if (this.reconnectionEnabled && this.reconnectionReady && this.peerPersistence) {
+          this.peerPersistence.storePeer({
+            peerId: uuid,
+            userId: uuid,
+            displayName: displayName,
+            firstSeen: Date.now(),
+            lastSeen: Date.now(),
+            lastConnected: null,
+            publicKey: null,
+            connectionQuality: {
+              latency: null,
+              successRate: 0,
+              connectionType: 'pending',
+              lastMeasured: Date.now(),
+              totalConnections: 0,
+              successfulConnections: 0,
+              avgUptime: 0
+            },
+            reconnectionAttempts: 0,
+            metadata: {
+              storedDuringSignaling: true
+            }
+          }).catch(error => {
+            console.error(`[Mesh] Failed to store peer intent for ${uuid.substring(0, 8)}:`, error);
+          });
+        }
+
         const peer = new SimplePeer({
           initiator: false,
           trickle: false,
@@ -433,8 +462,17 @@ class MeshNetwork {
 
         this.peers.set(uuid, peerData);
 
+        // Wait for reconnection system initialization if needed
+        if (this.reconnectionEnabled && !this.reconnectionReady && this._initPromise) {
+          try {
+            await this._initPromise;
+          } catch (error) {
+            console.error('[Mesh] Reconnection system initialization failed during peer connect:', error);
+          }
+        }
+
         // Set up ICE connection state monitoring for disconnection detection
-        if (peer._pc && this.reconnectionEnabled && this.masterReconnect) {
+        if (peer._pc && this.reconnectionEnabled && this.reconnectionReady && this.masterReconnect) {
           peer._pc.addEventListener('iceconnectionstatechange', () => {
             const iceState = peer._pc.iceConnectionState;
 
@@ -450,12 +488,12 @@ class MeshNetwork {
         }
 
         // Store peer in persistence for reconnection
-        if (this.reconnectionEnabled && this.peerPersistence) {
+        if (this.reconnectionEnabled && this.reconnectionReady && this.peerPersistence) {
           await this.storePeerForReconnection(uuid, peerData, peer);
         }
 
         // Exchange cryptographic identity
-        if (this.reconnectionEnabled && this.reconnectionAuth) {
+        if (this.reconnectionEnabled && this.reconnectionReady && this.reconnectionAuth) {
           try {
             await this.reconnectionAuth.exchangeIdentity(peer, uuid);
 
@@ -468,6 +506,7 @@ class MeshNetwork {
             // Exchange reconnection credentials
             await this.exchangeReconnectionCredentials(peer, uuid);
           } catch (error) {
+            console.error(`[Mesh] Failed to exchange identity with ${uuid.substring(0, 8)}:`, error);
           }
         }
 
@@ -854,7 +893,7 @@ class MeshNetwork {
 
     try {
       // Attempt mesh relay reconnection immediately
-      const result = await this.masterReconnect.meshReconnect.attemptReconnection(peerId, displayName, connectionHint);
+      const result = await this.masterReconnect.meshReconnect.reconnectViaMesh(peerId, displayName);
       return result;
     } catch (error) {
       console.error(`[Mesh] Failed to reconnect to peer ${peerId.substring(0, 8)}:`, error);
